@@ -1,9 +1,9 @@
 # xleak
 
-[![CI](https://github.com/bgreenwell/xleak/actions/workflows/ci.yml/badge.svg)](https://github.com/bgreenwell/xleak/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/xleak.svg)](https://crates.io/crates/xleak)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+[![CI](https://github.com/bgreenwell/xleak/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/bgreenwell/xleak/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/xleak.svg?style=for-the-badge)](https://crates.io/crates/xleak)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 > Expose Excel files in your terminal - no Microsoft Excel required!
 
