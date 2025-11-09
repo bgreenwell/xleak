@@ -36,7 +36,7 @@ jobs:
       - name: Calculate SHA256
         id: sha
         run: |
-          URL="https://github.com/greenwbm/xleak/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
+          URL="https://github.com/bgreenwell/xleak/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
           SHA=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
           echo "sha256=$SHA" >> $GITHUB_OUTPUT
           echo "Calculated SHA256: $SHA"
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout tap repository
         uses: actions/checkout@v4
         with:
-          repository: greenwbm/homebrew-xleak
+          repository: bgreenwell/homebrew-xleak
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-xleak
 
@@ -54,11 +54,11 @@ jobs:
           cat > Formula/xleak.rb <<'EOF'
           class Xleak < Formula
             desc "Terminal Excel viewer with interactive TUI, search, formulas, and export"
-            homepage "https://github.com/greenwbm/xleak"
-            url "https://github.com/greenwbm/xleak/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
+            homepage "https://github.com/bgreenwell/xleak"
+            url "https://github.com/bgreenwell/xleak/archive/refs/tags/${{ steps.version.outputs.tag }}.tar.gz"
             sha256 "${{ steps.sha.outputs.sha256 }}"
             license "MIT"
-            head "https://github.com/greenwbm/xleak.git", branch: "main"
+            head "https://github.com/bgreenwell/xleak.git", branch: "main"
 
             depends_on "rust" => :build
 
