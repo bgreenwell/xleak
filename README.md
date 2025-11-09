@@ -1,3 +1,5 @@
+<img src="assets/logo.jpg" alt="xleak logo" align="right" width="120">
+
 # xleak
 
 [![CI](https://img.shields.io/github/actions/workflow/status/bgreenwell/xleak/ci.yml?style=for-the-badge)](https://github.com/bgreenwell/xleak/actions/workflows/ci.yml)
