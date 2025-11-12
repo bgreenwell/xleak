@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Configuration file support via TOML at `~/.config/xleak/config.toml` (thanks [@izelnakri](https://github.com/izelnakri) for the suggestion! [#1](https://github.com/bgreenwell/xleak/issues/1))
+- Six built-in color themes: Default, Dracula, Solarized Dark/Light, GitHub Dark, Nord
+- VIM keybinding profile with hjkl navigation, gg/G jumps, and yank operations
+- Custom keybinding overrides for 23 different actions
+- `--config` flag to specify custom configuration file location
+
+### Changed
+- Help screen now includes configuration information
+
 ## [0.1.0] - 2025-01-08
 
 ### Added
