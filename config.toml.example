@@ -1,0 +1,177 @@
+# xleak configuration file
+# =======================
+#
+# Location: $XDG_CONFIG_HOME/xleak/config.toml (usually ~/.config/xleak/config.toml)
+#
+# Platform-specific fallback locations:
+#   macOS:   ~/Library/Application Support/xleak/config.toml
+#   Linux:   ~/.config/xleak/config.toml
+#   Windows: %APPDATA%\xleak\config.toml
+#
+# Custom location: xleak --config /path/to/config.toml file.xlsx -i
+#
+# Quick start:
+#   1. Copy this file: cp config.toml.example ~/.config/xleak/config.toml
+#   2. Uncomment and modify settings below
+#   3. Test: xleak file.xlsx -i
+
+# =============================================================================
+# THEME SETTINGS
+# =============================================================================
+
+[theme]
+# Default theme to use on startup
+# Press 't' in interactive mode to cycle through themes at runtime
+#
+# Available themes:
+#   "Default"         - Clean light theme with subtle colors
+#   "Dracula"         - Popular dark theme with purple accents
+#   "Solarized Dark"  - Precision colors for machines and people
+#   "Solarized Light" - Light variant of Solarized
+#   "GitHub Dark"     - GitHub's dark color scheme
+#   "Nord"            - Arctic, north-bluish color palette
+default = "Default"
+
+# =============================================================================
+# UI SETTINGS
+# =============================================================================
+
+[ui]
+# Default maximum rows to display in non-interactive mode (0 = all)
+# Only affects: xleak file.xlsx (without -i flag)
+# Does NOT affect interactive TUI mode (which always shows all rows with lazy loading)
+max_rows = 50
+
+# Default maximum column width in characters
+# Applies to both interactive and non-interactive modes
+# Can be overridden with -w flag: xleak file.xlsx -w 40
+column_width = 30
+
+# =============================================================================
+# KEYBINDINGS
+# =============================================================================
+
+[keybindings]
+# Keybinding profile: "default" or "vim"
+#
+# "default" profile:
+#   Navigation: Arrow keys, PgUp/PgDn, Home/End, Ctrl+Home/End
+#   Copy: c (cell), C (row)
+#   Other: /, n, N, q, ?, t, Ctrl+g, Enter, Tab
+#
+# "vim" profile:
+#   Navigation: h/j/k/l, Ctrl+u/d, gg, G, 0, $
+#   Copy: y (cell), Y (row) - "yank" in VIM terminology
+#   Other: Same as default (/, n, N, q, ?, t, etc.)
+profile = "default"
+
+# -----------------------------------------------------------------------------
+# Custom Keybindings (optional - overrides profile)
+# -----------------------------------------------------------------------------
+# Uncomment [keybindings.custom] and any actions below to customize
+# Format: action = "key" or "Modifier+key"
+# Examples: "q", "Ctrl+g", "Shift+Tab", "Alt+s"
+#
+# Available modifiers: Ctrl, Shift, Alt
+# Special keys: Enter, Esc, Tab, BackTab, Home, End, PageUp, PageDown,
+#               Up, Down, Left, Right, Backspace, Delete, Insert
+
+# [keybindings.custom]
+
+# -----------------------------------------------------------------------------
+# General Actions
+# -----------------------------------------------------------------------------
+# quit = "q"              # Exit application
+# help = "?"              # Show help screen
+# theme_toggle = "t"      # Cycle through themes
+
+# -----------------------------------------------------------------------------
+# Search Actions
+# -----------------------------------------------------------------------------
+# search = "/"            # Open search prompt
+# next_match = "n"        # Jump to next search result
+# prev_match = "N"        # Jump to previous result (Shift+n)
+
+# -----------------------------------------------------------------------------
+# Copy Actions
+# -----------------------------------------------------------------------------
+# copy_cell = "c"         # Copy current cell to clipboard
+# copy_row = "C"          # Copy entire row (Shift+c)
+
+# -----------------------------------------------------------------------------
+# Cell Actions
+# -----------------------------------------------------------------------------
+# show_cell_detail = "Enter"  # Show cell detail popup (formula, full value)
+# jump = "Ctrl+g"             # Jump to specific cell (e.g., A100, 10,5)
+
+# -----------------------------------------------------------------------------
+# Sheet Navigation
+# -----------------------------------------------------------------------------
+# next_sheet = "Tab"          # Switch to next sheet
+# prev_sheet = "Shift+Tab"    # Switch to previous sheet
+
+# -----------------------------------------------------------------------------
+# Cell Navigation (customize for arrow-less keyboards or personal preference)
+# -----------------------------------------------------------------------------
+# up = "Up"               # Move up one cell
+# down = "Down"           # Move down one cell
+# left = "Left"           # Move left one cell
+# right = "Right"         # Move right one cell
+
+# -----------------------------------------------------------------------------
+# Page Navigation
+# -----------------------------------------------------------------------------
+# page_up = "PageUp"      # Scroll up one page
+# page_down = "PageDown"  # Scroll down one page
+
+# -----------------------------------------------------------------------------
+# Jump Navigation
+# -----------------------------------------------------------------------------
+# jump_to_top = "Ctrl+Home"      # Jump to first row
+# jump_to_bottom = "Ctrl+End"    # Jump to last row
+# jump_to_row_start = "Home"     # Jump to first column
+# jump_to_row_end = "End"        # Jump to last column
+
+# =============================================================================
+# EXAMPLE CONFIGURATIONS
+# =============================================================================
+
+# Example 1: Minimal config (theme only)
+# ----------------------------------------
+# [theme]
+# default = "Nord"
+
+# Example 2: VIM user
+# ----------------------------------------
+# [theme]
+# default = "Dracula"
+#
+# [keybindings]
+# profile = "vim"
+
+# Example 3: Custom workflow
+# ----------------------------------------
+# [theme]
+# default = "GitHub Dark"
+#
+# [ui]
+# max_rows = 100
+# column_width = 40
+#
+# [keybindings]
+# profile = "default"
+#
+# [keybindings.custom]
+# quit = "x"
+# search = "s"
+# copy_cell = "Ctrl+c"
+# copy_row = "Ctrl+Shift+c"
+
+# Example 4: Arrow-less keyboard (60% keyboard)
+# ------------------------------------------------
+# [keybindings]
+# profile = "vim"  # Use hjkl for navigation
+#
+# [keybindings.custom]
+# page_up = "Ctrl+b"      # Override vim's Ctrl+u
+# page_down = "Ctrl+f"    # Override vim's Ctrl+d

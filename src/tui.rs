@@ -1,5 +1,5 @@
 use crate::workbook::{CellValue, LazySheetData, SheetData, Workbook};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use arboard::Clipboard;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
@@ -15,6 +15,306 @@ use ratatui::{
 };
 use std::io;
 use std::time::{Duration, Instant};
+
+/// Available themes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Theme {
+    Default,
+    Dracula,
+    SolarizedDark,
+    SolarizedLight,
+    GitHubDark,
+    Nord,
+}
+
+impl Theme {
+    /// Get all available themes
+    pub fn all() -> &'static [Theme] {
+        &[
+            Theme::Default,
+            Theme::Dracula,
+            Theme::SolarizedDark,
+            Theme::SolarizedLight,
+            Theme::GitHubDark,
+            Theme::Nord,
+        ]
+    }
+
+    /// Get the next theme in the cycle
+    pub fn next(&self) -> Theme {
+        let themes = Self::all();
+        let current_idx = themes.iter().position(|t| t == self).unwrap_or(0);
+        themes[(current_idx + 1) % themes.len()]
+    }
+
+    /// Get theme name for display
+    pub fn name(&self) -> &'static str {
+        match self {
+            Theme::Default => "Default",
+            Theme::Dracula => "Dracula",
+            Theme::SolarizedDark => "Solarized Dark",
+            Theme::SolarizedLight => "Solarized Light",
+            Theme::GitHubDark => "GitHub Dark",
+            Theme::Nord => "Nord",
+        }
+    }
+
+    /// Get the color scheme for this theme
+    pub fn colors(&self) -> ColorScheme {
+        match self {
+            Theme::Default => ColorScheme::default_theme(),
+            Theme::Dracula => ColorScheme::dracula(),
+            Theme::SolarizedDark => ColorScheme::solarized_dark(),
+            Theme::SolarizedLight => ColorScheme::solarized_light(),
+            Theme::GitHubDark => ColorScheme::github_dark(),
+            Theme::Nord => ColorScheme::nord(),
+        }
+    }
+}
+
+/// Color scheme for the TUI
+#[derive(Debug, Clone)]
+pub struct ColorScheme {
+    // Cell type colors
+    pub string_fg: Color,
+    pub number_fg: Color,
+    pub bool_fg: Color,
+    pub datetime_fg: Color,
+    pub error_fg: Color,
+    pub empty_fg: Color,
+
+    // UI element colors
+    pub header_fg: Color,
+    pub header_bg: Option<Color>,
+    pub current_cell_fg: Color,
+    pub current_cell_bg: Color,
+    pub current_row_bg: Color,
+    pub current_col_fg: Color,
+    pub alternating_row_bg: Option<Color>,
+
+    // Search colors
+    pub search_match_fg: Color,
+    pub search_match_bg: Color,
+    pub current_search_fg: Color,
+    pub current_search_bg: Color,
+
+    // Border and status bar
+    pub border_fg: Color,
+    pub status_bar_fg: Color,
+    pub status_bar_bg: Option<Color>,
+}
+
+impl ColorScheme {
+    /// Default theme (current behavior with enhancements)
+    pub fn default_theme() -> Self {
+        Self {
+            // Cell types
+            string_fg: Color::White,
+            number_fg: Color::Cyan,
+            bool_fg: Color::Magenta,
+            datetime_fg: Color::Green,
+            error_fg: Color::Red,
+            empty_fg: Color::DarkGray,
+
+            // UI elements
+            header_fg: Color::Yellow,
+            header_bg: None,
+            current_cell_fg: Color::White,
+            current_cell_bg: Color::Blue,
+            current_row_bg: Color::DarkGray,
+            current_col_fg: Color::Cyan,
+            alternating_row_bg: Some(Color::Rgb(25, 25, 28)),
+
+            // Search
+            search_match_fg: Color::Black,
+            search_match_bg: Color::LightYellow,
+            current_search_fg: Color::Black,
+            current_search_bg: Color::Yellow,
+
+            // Borders/status
+            border_fg: Color::White,
+            status_bar_fg: Color::White,
+            status_bar_bg: None,
+        }
+    }
+
+    /// Dracula theme (purple/pink aesthetic)
+    pub fn dracula() -> Self {
+        Self {
+            // Cell types - Dracula palette
+            string_fg: Color::Rgb(248, 248, 242),  // Foreground
+            number_fg: Color::Rgb(189, 147, 249),  // Purple
+            bool_fg: Color::Rgb(255, 121, 198),    // Pink
+            datetime_fg: Color::Rgb(80, 250, 123), // Green
+            error_fg: Color::Rgb(255, 85, 85),     // Red
+            empty_fg: Color::Rgb(98, 114, 164),    // Comment
+
+            // UI elements
+            header_fg: Color::Rgb(139, 233, 253),    // Cyan
+            header_bg: Some(Color::Rgb(68, 71, 90)), // Current line
+            current_cell_fg: Color::Rgb(248, 248, 242),
+            current_cell_bg: Color::Rgb(98, 114, 164), // Comment (darker)
+            current_row_bg: Color::Rgb(68, 71, 90),    // Current line
+            current_col_fg: Color::Rgb(139, 233, 253), // Cyan
+            alternating_row_bg: Some(Color::Rgb(50, 52, 65)),
+
+            // Search
+            search_match_fg: Color::Rgb(40, 42, 54), // Background
+            search_match_bg: Color::Rgb(241, 250, 140), // Yellow
+            current_search_fg: Color::Rgb(40, 42, 54),
+            current_search_bg: Color::Rgb(255, 184, 108), // Orange
+
+            // Borders/status
+            border_fg: Color::Rgb(98, 114, 164), // Comment
+            status_bar_fg: Color::Rgb(248, 248, 242),
+            status_bar_bg: Some(Color::Rgb(68, 71, 90)),
+        }
+    }
+
+    /// Solarized Dark theme
+    pub fn solarized_dark() -> Self {
+        Self {
+            // Cell types - Solarized Dark
+            string_fg: Color::Rgb(131, 148, 150), // Base0
+            number_fg: Color::Rgb(38, 139, 210),  // Blue
+            bool_fg: Color::Rgb(211, 54, 130),    // Magenta
+            datetime_fg: Color::Rgb(133, 153, 0), // Green
+            error_fg: Color::Rgb(220, 50, 47),    // Red
+            empty_fg: Color::Rgb(88, 110, 117),   // Base01
+
+            // UI elements
+            header_fg: Color::Rgb(181, 137, 0),     // Yellow
+            header_bg: Some(Color::Rgb(7, 54, 66)), // Base02
+            current_cell_fg: Color::Rgb(253, 246, 227),
+            current_cell_bg: Color::Rgb(88, 110, 117), // Base01
+            current_row_bg: Color::Rgb(7, 54, 66),     // Base02
+            current_col_fg: Color::Rgb(42, 161, 152),  // Cyan
+            alternating_row_bg: Some(Color::Rgb(0, 43, 54)),
+
+            // Search
+            search_match_fg: Color::Rgb(0, 43, 54),
+            search_match_bg: Color::Rgb(181, 137, 0), // Yellow
+            current_search_fg: Color::Rgb(0, 43, 54),
+            current_search_bg: Color::Rgb(203, 75, 22), // Orange
+
+            // Borders/status
+            border_fg: Color::Rgb(88, 110, 117),
+            status_bar_fg: Color::Rgb(131, 148, 150),
+            status_bar_bg: Some(Color::Rgb(7, 54, 66)),
+        }
+    }
+
+    /// Solarized Light theme
+    pub fn solarized_light() -> Self {
+        Self {
+            // Cell types - Solarized Light
+            string_fg: Color::Rgb(101, 123, 131), // Base00
+            number_fg: Color::Rgb(38, 139, 210),  // Blue
+            bool_fg: Color::Rgb(211, 54, 130),    // Magenta
+            datetime_fg: Color::Rgb(133, 153, 0), // Green
+            error_fg: Color::Rgb(220, 50, 47),    // Red
+            empty_fg: Color::Rgb(147, 161, 161),  // Base1
+
+            // UI elements
+            header_fg: Color::Rgb(181, 137, 0),         // Yellow
+            header_bg: Some(Color::Rgb(238, 232, 213)), // Base2
+            current_cell_fg: Color::Rgb(0, 43, 54),     // Base02
+            current_cell_bg: Color::Rgb(147, 161, 161), // Base1
+            current_row_bg: Color::Rgb(238, 232, 213),  // Base2
+            current_col_fg: Color::Rgb(42, 161, 152),   // Cyan
+            alternating_row_bg: Some(Color::Rgb(253, 246, 227)),
+
+            // Search
+            search_match_fg: Color::Rgb(0, 43, 54),
+            search_match_bg: Color::Rgb(181, 137, 0), // Yellow
+            current_search_fg: Color::Rgb(253, 246, 227),
+            current_search_bg: Color::Rgb(203, 75, 22), // Orange
+
+            // Borders/status
+            border_fg: Color::Rgb(147, 161, 161),
+            status_bar_fg: Color::Rgb(101, 123, 131),
+            status_bar_bg: Some(Color::Rgb(238, 232, 213)),
+        }
+    }
+
+    /// GitHub Dark theme
+    pub fn github_dark() -> Self {
+        Self {
+            // Cell types - GitHub Dark
+            string_fg: Color::Rgb(201, 209, 217),   // fgDefault
+            number_fg: Color::Rgb(121, 192, 255),   // prettylights-syntax-constant
+            bool_fg: Color::Rgb(255, 125, 163),     // prettylights-syntax-entity
+            datetime_fg: Color::Rgb(127, 219, 202), // prettylights-syntax-string
+            error_fg: Color::Rgb(248, 81, 73),      // danger-fg
+            empty_fg: Color::Rgb(110, 118, 129),    // fgMuted
+
+            // UI elements
+            header_fg: Color::Rgb(255, 199, 119), // prettylights-syntax-entity-tag
+            header_bg: Some(Color::Rgb(33, 38, 45)), // canvas-subtle
+            current_cell_fg: Color::Rgb(201, 209, 217),
+            current_cell_bg: Color::Rgb(56, 139, 253), // accent-emphasis
+            current_row_bg: Color::Rgb(33, 38, 45),    // canvas-subtle
+            current_col_fg: Color::Rgb(121, 192, 255),
+            alternating_row_bg: Some(Color::Rgb(22, 27, 34)),
+
+            // Search
+            search_match_fg: Color::Rgb(13, 17, 23),
+            search_match_bg: Color::Rgb(187, 128, 9), // attention-emphasis
+            current_search_fg: Color::Rgb(13, 17, 23),
+            current_search_bg: Color::Rgb(242, 130, 33), // severe-emphasis
+
+            // Borders/status
+            border_fg: Color::Rgb(48, 54, 61), // border-default
+            status_bar_fg: Color::Rgb(201, 209, 217),
+            status_bar_bg: Some(Color::Rgb(33, 38, 45)),
+        }
+    }
+
+    /// Nord theme (cool blue/cyan palette)
+    pub fn nord() -> Self {
+        Self {
+            // Cell types - Nord
+            string_fg: Color::Rgb(216, 222, 233),   // nord4
+            number_fg: Color::Rgb(136, 192, 208),   // nord8
+            bool_fg: Color::Rgb(180, 142, 173),     // nord15
+            datetime_fg: Color::Rgb(163, 190, 140), // nord14
+            error_fg: Color::Rgb(191, 97, 106),     // nord11
+            empty_fg: Color::Rgb(76, 86, 106),      // nord3
+
+            // UI elements
+            header_fg: Color::Rgb(235, 203, 139),    // nord13
+            header_bg: Some(Color::Rgb(59, 66, 82)), // nord1
+            current_cell_fg: Color::Rgb(236, 239, 244),
+            current_cell_bg: Color::Rgb(94, 129, 172), // nord9
+            current_row_bg: Color::Rgb(59, 66, 82),    // nord1
+            current_col_fg: Color::Rgb(136, 192, 208), // nord8
+            alternating_row_bg: Some(Color::Rgb(46, 52, 64)),
+
+            // Search
+            search_match_fg: Color::Rgb(46, 52, 64),
+            search_match_bg: Color::Rgb(235, 203, 139), // nord13
+            current_search_fg: Color::Rgb(46, 52, 64),
+            current_search_bg: Color::Rgb(208, 135, 112), // nord12
+
+            // Borders/status
+            border_fg: Color::Rgb(76, 86, 106), // nord3
+            status_bar_fg: Color::Rgb(216, 222, 233),
+            status_bar_bg: Some(Color::Rgb(59, 66, 82)),
+        }
+    }
+
+    /// Get foreground color for a cell based on its value type
+    pub fn cell_color(&self, cell: &CellValue) -> Color {
+        match cell {
+            CellValue::Empty => self.empty_fg,
+            CellValue::String(_) => self.string_fg,
+            CellValue::Int(_) | CellValue::Float(_) => self.number_fg,
+            CellValue::Bool(_) => self.bool_fg,
+            CellValue::Error(_) => self.error_fg,
+            CellValue::DateTime(_) => self.datetime_fg,
+        }
+    }
+}
 
 /// Cached row data for lazy loading
 struct RowCache {
@@ -191,13 +491,17 @@ pub struct TuiState {
     copy_feedback: Option<(String, Instant)>, // Message and timestamp for copy feedback
     // Progress state
     progress: Option<ProgressInfo>, // Current operation progress
+    // Theme state
+    current_theme: Theme, // Current color theme
+    // Config state
+    config: crate::config::Config, // User configuration
 }
 
 impl TuiState {
     const LAZY_LOADING_THRESHOLD: usize = 1000; // Use lazy loading for sheets with >1000 rows
     const ROW_CACHE_SIZE: usize = 200; // Cache 200 rows at a time for lazy loading
 
-    pub fn new(mut workbook: Workbook, initial_sheet_name: &str) -> Result<Self> {
+    pub fn new(mut workbook: Workbook, initial_sheet_name: &str, config: &crate::config::Config) -> Result<Self> {
         let sheet_names = workbook.sheet_names();
         let current_sheet_index = sheet_names
             .iter()
@@ -243,7 +547,21 @@ impl TuiState {
             jump_input: String::new(),
             copy_feedback: None,
             progress: None,
+            current_theme: Self::parse_theme_name(&config.theme.default),
+            config: config.clone(),
         })
+    }
+
+    /// Parse theme name from config string
+    fn parse_theme_name(name: &str) -> Theme {
+        match name.to_lowercase().as_str() {
+            "dracula" => Theme::Dracula,
+            "solarized dark" | "solarizeddark" => Theme::SolarizedDark,
+            "solarized light" | "solarizedlight" => Theme::SolarizedLight,
+            "github dark" | "githubdark" => Theme::GitHubDark,
+            "nord" => Theme::Nord,
+            _ => Theme::Default, // Fallback to default for unknown themes
+        }
     }
 
     fn current_sheet_name(&self) -> &str {
@@ -668,13 +986,20 @@ impl TuiState {
         )
     }
 
+    /// Check if a key press matches a configured action
+    fn key_matches(&self, code: KeyCode, modifiers: crossterm::event::KeyModifiers, action: &str) -> bool {
+        if let Some((expected_code, expected_mods)) = self.config.get_keybinding(action) {
+            code == expected_code && modifiers == expected_mods
+        } else {
+            false
+        }
+    }
+
     fn handle_event(&mut self, event: Event) {
         if let Event::Key(KeyEvent {
             code, modifiers, ..
         }) = event
         {
-            use crossterm::event::KeyModifiers;
-
             // If help is showing, any key closes it
             if self.show_help {
                 self.show_help = false;
@@ -735,84 +1060,61 @@ impl TuiState {
                 return;
             }
 
-            // Normal navigation and commands
-            match code {
-                KeyCode::Char('q') => {
+            // Normal navigation and commands - using configured keybindings
+            // Check actions in order of priority
+            if self.key_matches(code, modifiers, "quit") {
+                self.should_quit = true;
+            } else if self.key_matches(code, modifiers, "help") {
+                self.show_help = true;
+            } else if self.key_matches(code, modifiers, "theme_toggle") {
+                self.current_theme = self.current_theme.next();
+            } else if self.key_matches(code, modifiers, "search") {
+                self.search_mode = true;
+                self.clear_search();
+            } else if self.key_matches(code, modifiers, "next_match") {
+                self.jump_to_next_match();
+            } else if self.key_matches(code, modifiers, "prev_match") {
+                self.jump_to_prev_match();
+            } else if self.key_matches(code, modifiers, "copy_cell") {
+                self.copy_current_cell();
+            } else if self.key_matches(code, modifiers, "copy_row") {
+                self.copy_current_row();
+            } else if self.key_matches(code, modifiers, "jump") {
+                self.enter_jump_mode();
+            } else if self.key_matches(code, modifiers, "show_cell_detail") {
+                self.show_cell_detail = true;
+            } else if self.key_matches(code, modifiers, "next_sheet") {
+                let _ = self.switch_to_next_sheet();
+            } else if self.key_matches(code, modifiers, "prev_sheet") || code == KeyCode::BackTab {
+                // BackTab is another way to detect Shift+Tab on some terminals
+                let _ = self.switch_to_prev_sheet();
+            } else if self.key_matches(code, modifiers, "up") {
+                self.move_up();
+            } else if self.key_matches(code, modifiers, "down") {
+                self.move_down();
+            } else if self.key_matches(code, modifiers, "left") {
+                self.move_left();
+            } else if self.key_matches(code, modifiers, "right") {
+                self.move_right();
+            } else if self.key_matches(code, modifiers, "jump_to_top") {
+                self.move_to_top();
+            } else if self.key_matches(code, modifiers, "jump_to_bottom") {
+                self.move_to_bottom();
+            } else if self.key_matches(code, modifiers, "jump_to_row_start") {
+                self.move_to_start_of_row();
+            } else if self.key_matches(code, modifiers, "jump_to_row_end") {
+                self.move_to_end_of_row();
+            } else if self.key_matches(code, modifiers, "page_up") {
+                self.page_up(10);
+            } else if self.key_matches(code, modifiers, "page_down") {
+                self.page_down(10);
+            } else if code == KeyCode::Esc {
+                // Special handling for Esc - clear search if active, otherwise quit
+                if !self.search_matches.is_empty() {
+                    self.clear_search();
+                } else {
                     self.should_quit = true;
                 }
-                KeyCode::Char('?') => {
-                    self.show_help = true;
-                }
-                KeyCode::Char('/') => {
-                    // Enter search mode
-                    self.search_mode = true;
-                    self.clear_search();
-                }
-                KeyCode::Char('n') => {
-                    // Jump to next search match
-                    self.jump_to_next_match();
-                }
-                KeyCode::Char('N') => {
-                    // Jump to previous search match
-                    self.jump_to_prev_match();
-                }
-                KeyCode::Char('c') => {
-                    // Copy current cell
-                    self.copy_current_cell();
-                }
-                KeyCode::Char('C') => {
-                    // Copy current row
-                    self.copy_current_row();
-                }
-                KeyCode::Char('g') if modifiers.contains(KeyModifiers::CONTROL) => {
-                    // Enter jump mode (Ctrl+G)
-                    self.enter_jump_mode();
-                }
-                KeyCode::Enter => {
-                    // Show cell detail view
-                    self.show_cell_detail = true;
-                }
-                KeyCode::Esc => {
-                    // Clear search if active, otherwise quit
-                    if !self.search_matches.is_empty() {
-                        self.clear_search();
-                    } else {
-                        self.should_quit = true;
-                    }
-                }
-                KeyCode::Tab => {
-                    // Tab to switch to next sheet, Shift+Tab for previous
-                    if modifiers.contains(KeyModifiers::SHIFT) {
-                        let _ = self.switch_to_prev_sheet();
-                    } else {
-                        let _ = self.switch_to_next_sheet();
-                    }
-                }
-                KeyCode::BackTab => {
-                    // BackTab is another way to detect Shift+Tab on some terminals
-                    let _ = self.switch_to_prev_sheet();
-                }
-                KeyCode::Up => self.move_up(),
-                KeyCode::Down => self.move_down(),
-                KeyCode::Left => self.move_left(),
-                KeyCode::Right => self.move_right(),
-                KeyCode::Home => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        self.move_to_top();
-                    } else {
-                        self.move_to_start_of_row();
-                    }
-                }
-                KeyCode::End => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        self.move_to_bottom();
-                    } else {
-                        self.move_to_end_of_row();
-                    }
-                }
-                KeyCode::PageUp => self.page_up(10),
-                KeyCode::PageDown => self.page_down(10),
-                _ => {}
             }
         }
     }
@@ -837,20 +1139,27 @@ impl TuiState {
         // Clone headers to avoid borrow issues
         let headers = self.sheet_data.headers().to_vec();
 
+        // Get theme colors
+        let colors = self.current_theme.colors();
+
         // Build table rows with highlighting
         let header_cells: Vec<Cell> = headers
             .iter()
             .enumerate()
             .map(|(col_idx, h)| {
-                let style = if col_idx == self.cursor_col {
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD)
-                };
+                let mut style = Style::default()
+                    .fg(colors.header_fg)
+                    .add_modifier(Modifier::BOLD);
+
+                if let Some(bg) = colors.header_bg {
+                    style = style.bg(bg);
+                }
+
+                // Highlight current column header
+                if col_idx == self.cursor_col {
+                    style = style.fg(colors.current_col_fg);
+                }
+
                 Cell::from(h.as_str()).style(style)
             })
             .collect();
@@ -870,7 +1179,14 @@ impl TuiState {
                     .iter()
                     .enumerate()
                     .map(|(col_idx, cell)| {
-                        let mut style = Style::default();
+                        // Start with cell type color
+                        let mut style = Style::default().fg(colors.cell_color(cell));
+
+                        // Add alternating row background (only if not the current row)
+                        let is_alternating_row = row_idx % 2 == 1;
+                        if is_alternating_row && let Some(alt_bg) = colors.alternating_row_bg {
+                            style = style.bg(alt_bg);
+                        }
 
                         // Check if this cell is a search match
                         let is_search_match = self.search_matches.contains(&(row_idx, col_idx));
@@ -883,28 +1199,28 @@ impl TuiState {
                         // Highlight current search match (highest priority)
                         if is_current_match {
                             style = style
-                                .bg(Color::Yellow)
-                                .fg(Color::Black)
+                                .bg(colors.current_search_bg)
+                                .fg(colors.current_search_fg)
                                 .add_modifier(Modifier::BOLD);
                         }
                         // Highlight current cell
                         else if row_idx == self.cursor_row && col_idx == self.cursor_col {
                             style = style
-                                .bg(Color::Blue)
-                                .fg(Color::White)
+                                .bg(colors.current_cell_bg)
+                                .fg(colors.current_cell_fg)
                                 .add_modifier(Modifier::BOLD);
                         }
                         // Highlight other search matches
                         else if is_search_match {
-                            style = style.bg(Color::LightYellow).fg(Color::Black);
+                            style = style.bg(colors.search_match_bg).fg(colors.search_match_fg);
                         }
                         // Highlight current row
                         else if row_idx == self.cursor_row {
-                            style = style.bg(Color::DarkGray);
+                            style = style.bg(colors.current_row_bg);
                         }
                         // Highlight current column
                         else if col_idx == self.cursor_col {
-                            style = style.fg(Color::Cyan);
+                            style = style.fg(colors.current_col_fg);
                         }
                         Cell::from(cell.to_string()).style(style)
                     })
@@ -931,9 +1247,12 @@ impl TuiState {
             format!(" {} ", self.current_sheet_name())
         };
 
-        let table = Table::new(data_rows, col_widths)
-            .header(header)
-            .block(Block::default().borders(Borders::ALL).title(table_title));
+        let table = Table::new(data_rows, col_widths).header(header).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_fg))
+                .title(table_title),
+        );
 
         frame.render_widget(table, chunks[0]);
 
@@ -980,30 +1299,36 @@ impl TuiState {
 
             if self.sheet_names.len() > 1 {
                 format!(
-                    " {} | {} rows × {} columns{} | /:search Tab:next sheet ?:help q:quit ",
+                    " {} | {} rows × {} columns{} | Theme: {} | t:theme /:search Tab:sheet ?:help q:quit ",
                     self.current_cell_address(),
                     self.sheet_data.height(),
                     self.sheet_data.width(),
-                    mode_indicator
+                    mode_indicator,
+                    self.current_theme.name()
                 )
             } else {
                 format!(
-                    " {} | {} rows × {} columns{} | /:search ?:help q:quit ",
+                    " {} | {} rows × {} columns{} | Theme: {} | t:theme /:search ?:help q:quit ",
                     self.current_cell_address(),
                     self.sheet_data.height(),
                     self.sheet_data.width(),
-                    mode_indicator
+                    mode_indicator,
+                    self.current_theme.name()
                 )
             }
         };
 
-        let status = Paragraph::new(status_text)
-            .style(Style::default().bg(Color::DarkGray).fg(Color::White))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!(" {} ", current_cell_value)),
-            );
+        let mut status_style = Style::default().fg(colors.status_bar_fg);
+        if let Some(bg) = colors.status_bar_bg {
+            status_style = status_style.bg(bg);
+        }
+
+        let status = Paragraph::new(status_text).style(status_style).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.border_fg))
+                .title(format!(" {} ", current_cell_value)),
+        );
 
         frame.render_widget(status, chunks[1]);
 
@@ -1143,6 +1468,10 @@ impl TuiState {
                 Span::raw("Show cell details (type, formula, value)"),
             ]),
             Line::from(vec![
+                Span::styled("  t                ", Style::default().fg(Color::Green)),
+                Span::raw("Cycle through color themes"),
+            ]),
+            Line::from(vec![
                 Span::styled("  ?                ", Style::default().fg(Color::Green)),
                 Span::raw("Toggle this help screen"),
             ]),
@@ -1200,6 +1529,11 @@ impl TuiState {
                 Span::raw("  Other search matches"),
             ]),
             Line::from(""),
+            Line::from("  Cell colors vary by type and current theme:"),
+            Line::from("  • Numbers, strings, dates, booleans, errors each have distinct colors"),
+            Line::from("  • Alternating row backgrounds improve readability"),
+            Line::from("  • Press 't' to cycle through 6 built-in themes"),
+            Line::from(""),
             Line::from(Span::styled(
                 "STATUS BAR INFO",
                 Style::default()
@@ -1210,6 +1544,21 @@ impl TuiState {
             Line::from("  Current cell value displayed in status bar title"),
             Line::from("  Sheet dimensions (rows × columns) shown"),
             Line::from("  Match counter shown when searching (e.g., Match 3/12)"),
+            Line::from(""),
+            Line::from(Span::styled(
+                "CONFIGURATION",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from("  Customize keybindings and theme in config file:"),
+            Line::from("  ~/.config/xleak/config.toml"),
+            Line::from(""),
+            Line::from("  Supports VIM-style navigation (hjkl, gg, G, 0, $)"),
+            Line::from("  Custom keybindings per action"),
+            Line::from("  Default theme selection"),
+            Line::from(""),
+            Line::from("  See config.toml.example for all options"),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Press any key to close",
@@ -1529,16 +1878,28 @@ impl TuiState {
 }
 
 /// Run the TUI application
-pub fn run_tui(workbook: Workbook, sheet_name: &str) -> Result<()> {
+pub fn run_tui(workbook: Workbook, sheet_name: &str, config: &crate::config::Config) -> Result<()> {
+    // Check if stdout is a TTY before attempting to use interactive mode
+    use std::io::IsTerminal;
+    if !io::stdout().is_terminal() {
+        anyhow::bail!(
+            "Interactive mode requires a terminal (TTY). \
+             Your output is redirected or not connected to a terminal.\n\
+             Hint: Run this command directly in your terminal, not through pipes or automation."
+        );
+    }
+
     // Setup terminal
-    enable_raw_mode()?;
+    enable_raw_mode().context("Failed to enable terminal raw mode. Is this a proper TTY?")?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen)
+        .context("Failed to enter alternate screen mode")?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend)
+        .context("Failed to initialize terminal backend")?;
 
     // Create app state
-    let mut app = TuiState::new(workbook, sheet_name)?;
+    let mut app = TuiState::new(workbook, sheet_name, config)?;
 
     // Main event loop
     let res = run_event_loop(&mut terminal, &mut app);

@@ -154,6 +154,251 @@ xleak data.xlsx -i --formulas
 xleak survey-results.xlsx --sheet "Responses" --export csv -n 0
 ```
 
+## Configuration
+
+xleak supports configuration via a TOML file for persistent settings like default theme and keybindings.
+
+### Config File Location
+
+**Default:** `~/.config/xleak/config.toml` (or `$XDG_CONFIG_HOME/xleak/config.toml`)
+
+**Platform-specific fallback locations:**
+- **macOS:** `~/Library/Application Support/xleak/config.toml`
+- **Linux:** `~/.config/xleak/config.toml` (same as XDG)
+- **Windows:** `%APPDATA%\xleak\config.toml`
+
+**Custom:** Use `--config` flag to specify a different location:
+```bash
+xleak --config /path/to/config.toml file.xlsx -i
+```
+
+### Quick Start
+
+1. **Copy the example:**
+   ```bash
+   mkdir -p ~/.config/xleak
+   cp config.toml.example ~/.config/xleak/config.toml
+   ```
+
+2. **Or create a minimal config:**
+   ```bash
+   mkdir -p ~/.config/xleak
+   cat > ~/.config/xleak/config.toml << 'EOF'
+   [theme]
+   default = "Dracula"
+
+   [ui]
+   max_rows = 50
+   column_width = 30
+
+   [keybindings]
+   profile = "vim"
+   EOF
+   ```
+
+3. **Test your config:**
+   ```bash
+   xleak file.xlsx -i
+   ```
+
+### Configuration Options
+
+#### Theme Settings
+
+```toml
+[theme]
+# Default theme to use on startup
+default = "Dracula"
+```
+
+**Available themes:**
+- `"Default"` - Clean light theme with subtle colors
+- `"Dracula"` - Popular dark theme with purple accents
+- `"Solarized Dark"` - Precision colors for machines and people
+- `"Solarized Light"` - Light variant of Solarized
+- `"GitHub Dark"` - GitHub's dark color scheme
+- `"Nord"` - Arctic, north-bluish color palette
+
+Press `t` in interactive mode to cycle through themes at runtime.
+
+#### UI Settings
+
+```toml
+[ui]
+# Default maximum rows to display in non-interactive mode (0 = all)
+max_rows = 50
+
+# Default maximum column width in characters
+column_width = 30
+```
+
+**Notes:**
+- `max_rows` only affects non-interactive display mode (`xleak file.xlsx`)
+- Interactive TUI mode (`-i`) always shows all rows with lazy loading for large files
+- `column_width` applies to both modes and can be overridden with `-w` flag
+
+#### Keybindings
+
+xleak supports two built-in profiles plus custom keybindings:
+
+```toml
+[keybindings]
+# Profile: "default" or "vim"
+profile = "default"
+
+# Optional: override individual keys
+[keybindings.custom]
+quit = "x"
+search = "?"
+copy_cell = "y"
+```
+
+### Keybinding Profiles
+
+#### Default Profile
+
+Standard keybindings for terminal applications:
+
+| Action | Key | Description |
+|--------|-----|-------------|
+| **Navigation** | | |
+| Move up/down/left/right | `↑` `↓` `←` `→` | Navigate cells |
+| Page up/down | `PgUp` `PgDn` | Scroll by page |
+| Jump to top/bottom | `Ctrl+Home` `Ctrl+End` | Jump to first/last row |
+| Jump to row start/end | `Home` `End` | Jump to first/last column |
+| **Actions** | | |
+| View cell details | `Enter` | Show formula and full value |
+| Jump to cell | `Ctrl+G` | Jump to specific row/cell |
+| Search | `/` | Full-text search |
+| Next/prev match | `n` `N` | Navigate search results |
+| Copy cell | `c` | Copy cell to clipboard |
+| Copy row | `C` (Shift+c) | Copy entire row |
+| **Sheets** | | |
+| Next/prev sheet | `Tab` `Shift+Tab` | Switch between sheets |
+| **General** | | |
+| Toggle theme | `t` | Cycle through themes |
+| Show help | `?` | Display help screen |
+| Quit | `q` | Exit application |
+
+#### VIM Profile
+
+VIM-style keybindings for efficient keyboard navigation:
+
+| Action | Key | Default Key | Description |
+|--------|-----|-------------|-------------|
+| **VIM Navigation** | | | |
+| Move left/down/up/right | `h` `j` `k` `l` | ← ↓ ↑ → | VIM-style movement |
+| Page up/down | `Ctrl+u` `Ctrl+d` | PgUp PgDn | Half-page scrolling |
+| Jump to top | `gg` | Ctrl+Home | Jump to first row |
+| Jump to bottom | `G` (Shift+g) | Ctrl+End | Jump to last row |
+| Jump to row start/end | `0` `$` | Home End | First/last column |
+| **VIM Actions** | | | |
+| Yank cell | `y` | `c` | Copy cell (yank) |
+| Yank row | `Y` (Shift+y) | `C` | Copy row (yank) |
+| **Standard** | | | |
+| Quit | `q` | `q` | Same as default |
+| Search | `/` | `/` | Same as default |
+| Next/prev match | `n` `N` | `n` `N` | Same as default |
+| All other keys | | | Same as default profile |
+
+**Enable VIM mode:**
+```toml
+[keybindings]
+profile = "vim"
+```
+
+### Custom Keybindings
+
+Override individual keys while keeping the profile defaults:
+
+```toml
+[keybindings]
+profile = "default"
+
+[keybindings.custom]
+# Use 'x' to quit instead of 'q'
+quit = "x"
+
+# Use '?' for search instead of '/'
+search = "?"
+
+# Use 'T' (Shift+t) to toggle theme
+theme_toggle = "T"
+
+# Use Ctrl+J to jump to cell
+jump = "Ctrl+j"
+```
+
+**All customizable actions:**
+
+| Action | Default | VIM | Description |
+|--------|---------|-----|-------------|
+| `quit` | `q` | `q` | Exit application |
+| `help` | `?` | `?` | Show help |
+| `theme_toggle` | `t` | `t` | Cycle themes |
+| `search` | `/` | `/` | Search cells |
+| `next_match` | `n` | `n` | Next search result |
+| `prev_match` | `N` | `N` | Previous result |
+| `copy_cell` | `c` | `y` | Copy cell |
+| `copy_row` | `C` | `Y` | Copy row |
+| `jump` | `Ctrl+g` | `Ctrl+g` | Jump to cell |
+| `show_cell_detail` | `Enter` | `Enter` | Show details |
+| `next_sheet` | `Tab` | `Tab` | Next sheet |
+| `prev_sheet` | `Shift+Tab` | `Shift+Tab` | Previous sheet |
+| `up` | `Up` | `k` | Move up |
+| `down` | `Down` | `j` | Move down |
+| `left` | `Left` | `h` | Move left |
+| `right` | `Right` | `l` | Move right |
+| `page_up` | `PageUp` | `Ctrl+u` | Page up |
+| `page_down` | `PageDown` | `Ctrl+d` | Page down |
+| `jump_to_top` | `Ctrl+Home` | `g` | First row |
+| `jump_to_bottom` | `Ctrl+End` | `G` | Last row |
+| `jump_to_row_start` | `Home` | `0` | First column |
+| `jump_to_row_end` | `End` | `$` | Last column |
+
+**Key format:**
+- Single key: `"q"`, `"/"`, `"Enter"`
+- With modifier: `"Ctrl+g"`, `"Shift+Tab"`, `"Alt+s"`
+- Special keys: `"Enter"`, `"Esc"`, `"Tab"`, `"Home"`, `"End"`, `"PageUp"`, `"PageDown"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`
+
+### Example Configurations
+
+**Minimal (theme only):**
+```toml
+[theme]
+default = "Nord"
+```
+
+**VIM user:**
+```toml
+[theme]
+default = "Dracula"
+
+[keybindings]
+profile = "vim"
+```
+
+**Custom workflow:**
+```toml
+[theme]
+default = "GitHub Dark"
+
+[ui]
+max_rows = 100
+column_width = 40
+
+[keybindings]
+profile = "default"
+
+[keybindings.custom]
+quit = "x"
+search = "s"
+copy_cell = "Ctrl+c"
+copy_row = "Ctrl+Shift+c"
+```
+
+**Full reference:** See `config.toml.example` for all options with detailed comments.
+
 ## Performance
 
 xleak is optimized for both small and large files:

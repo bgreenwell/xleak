@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
+mod config;
 mod display;
 mod tui;
 mod workbook;
@@ -41,10 +42,17 @@ struct Cli {
     /// Interactive TUI mode
     #[arg(short, long)]
     interactive: bool,
+
+    /// Path to custom config file (default: $XDG_CONFIG_HOME/xleak/config.toml)
+    #[arg(long, value_name = "PATH")]
+    config: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Load configuration
+    let config = config::Config::load(cli.config.clone())?;
 
     // Validate file exists
     if !cli.file.exists() {
@@ -88,7 +96,7 @@ fn main() -> Result<()> {
     // Display, export, or run TUI
     if cli.interactive {
         // Interactive TUI mode - pass the workbook so it can switch sheets
-        tui::run_tui(wb, &sheet_name)?;
+        tui::run_tui(wb, &sheet_name, &config)?;
     } else {
         // Load the sheet data for non-interactive modes
         let data = wb
