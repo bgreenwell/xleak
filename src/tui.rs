@@ -474,11 +474,14 @@ pub struct TuiState {
     current_sheet_index: usize,
     sheet_data: SheetDataSource,
     should_quit: bool,
-    cursor_row: usize,      // Current row (0-indexed in data)
-    cursor_col: usize,      // Current column (0-indexed)
-    scroll_offset: usize,   // Vertical scroll offset
-    show_help: bool,        // Help overlay visible
-    show_cell_detail: bool, // Cell detail popup visible
+    cursor_row: usize,               // Current row (0-indexed in data)
+    cursor_col: usize,               // Current column (0-indexed)
+    scroll_offset: usize,            // Vertical scroll offset
+    horizontal_scroll_offset: usize, // Horizontal scroll offset
+    horizontal_scroll_enabled: bool, // Whether horizontal scrolling is enabled
+    column_widths: Vec<usize>,       // Cached column widths for horizontal scroll
+    show_help: bool,                 // Help overlay visible
+    show_cell_detail: bool,          // Cell detail popup visible
     // Search state
     search_mode: bool,                   // Whether we're in search input mode
     search_query: String,                // Current search query
@@ -505,6 +508,7 @@ impl TuiState {
         mut workbook: Workbook,
         initial_sheet_name: &str,
         config: &crate::config::Config,
+        horizontal_scroll: bool,
     ) -> Result<Self> {
         let sheet_names = workbook.sheet_names();
         let current_sheet_index = sheet_names
@@ -532,7 +536,7 @@ impl TuiState {
             SheetDataSource::Eager(lazy_data.to_sheet_data())
         };
 
-        Ok(Self {
+        let mut state = Self {
             workbook,
             sheet_names,
             current_sheet_index,
@@ -541,6 +545,9 @@ impl TuiState {
             cursor_row: 0,
             cursor_col: 0,
             scroll_offset: 0,
+            horizontal_scroll_offset: 0,
+            horizontal_scroll_enabled: horizontal_scroll,
+            column_widths: Vec::new(),
             show_help: false,
             show_cell_detail: false,
             search_mode: false,
@@ -553,7 +560,14 @@ impl TuiState {
             progress: None,
             current_theme: Self::parse_theme_name(&config.theme.default),
             config: config.clone(),
-        })
+        };
+
+        // Calculate column widths if horizontal scrolling is enabled
+        if horizontal_scroll {
+            state.column_widths = state.calculate_column_widths();
+        }
+
+        Ok(state)
     }
 
     /// Parse theme name from config string
@@ -623,6 +637,11 @@ impl TuiState {
             SheetDataSource::Eager(lazy_data.to_sheet_data())
         };
 
+        // Recalculate column widths if horizontal scrolling is enabled
+        if self.horizontal_scroll_enabled {
+            self.column_widths = self.calculate_column_widths();
+        }
+
         Ok(())
     }
 
@@ -630,6 +649,7 @@ impl TuiState {
         self.cursor_row = 0;
         self.cursor_col = 0;
         self.scroll_offset = 0;
+        self.horizontal_scroll_offset = 0;
     }
 
     /// Perform case-insensitive search across all cells
@@ -934,24 +954,88 @@ impl TuiState {
         }
     }
 
+    /// Calculate column widths based on content
+    fn calculate_column_widths(&mut self) -> Vec<usize> {
+        let num_cols = self.sheet_data.width();
+        let mut widths = vec![0; num_cols];
+
+        // Measure headers
+        let headers = self.sheet_data.headers();
+        for (i, header) in headers.iter().enumerate() {
+            widths[i] = header.len();
+        }
+
+        // Sample first 100 rows (or fewer if sheet is smaller)
+        let sample_size = 100.min(self.sheet_data.height());
+        let (sample_rows, _) = self.sheet_data.get_rows(0, sample_size);
+
+        for row in sample_rows.iter() {
+            for (col_idx, cell) in row.iter().enumerate() {
+                let len = cell.to_string().len();
+                widths[col_idx] = widths[col_idx].max(len);
+            }
+        }
+
+        // Apply constraints: min 3 chars, max 30 chars
+        widths.iter().map(|&w| w.clamp(3, 30)).collect()
+    }
+
+    /// Update horizontal scroll offset to keep cursor visible
+    fn update_horizontal_scroll(&mut self, viewport_width: usize) {
+        if !self.horizontal_scroll_enabled {
+            return;
+        }
+
+        // Calculate which columns are visible
+        let mut total_width = 0;
+        let mut visible_end = self.horizontal_scroll_offset;
+
+        for i in self.horizontal_scroll_offset..self.column_widths.len() {
+            total_width += self.column_widths[i] + 1; // +1 for separator
+            visible_end = i + 1; // Always include current column
+            if total_width > viewport_width {
+                break; // Break after including partially-visible column
+            }
+        }
+
+        // Scroll right if cursor is beyond visible area
+        if self.cursor_col >= visible_end {
+            self.horizontal_scroll_offset += 1;
+        }
+
+        // Scroll left if cursor is before visible area
+        if self.cursor_col < self.horizontal_scroll_offset {
+            self.horizontal_scroll_offset = self.cursor_col;
+        }
+    }
+
     fn move_left(&mut self) {
         if self.cursor_col > 0 {
             self.cursor_col -= 1;
+            // Auto-scroll left if cursor moves before visible area
+            if self.horizontal_scroll_enabled && self.cursor_col < self.horizontal_scroll_offset {
+                self.horizontal_scroll_offset = self.cursor_col;
+            }
         }
     }
 
     fn move_right(&mut self) {
         if self.cursor_col < self.sheet_data.width().saturating_sub(1) {
             self.cursor_col += 1;
+            // Auto-scroll right will be handled in render based on viewport width
         }
     }
 
     fn move_to_start_of_row(&mut self) {
         self.cursor_col = 0;
+        if self.horizontal_scroll_enabled {
+            self.horizontal_scroll_offset = 0;
+        }
     }
 
     fn move_to_end_of_row(&mut self) {
         self.cursor_col = self.sheet_data.width().saturating_sub(1);
+        // Horizontal scroll will be updated in render to show the last column
     }
 
     fn page_up(&mut self, page_size: usize) {
@@ -1142,11 +1226,31 @@ impl TuiState {
 
         // Calculate visible viewport
         let table_height = chunks[0].height.saturating_sub(3) as usize; // Account for borders and header
+        let viewport_width = chunks[0].width.saturating_sub(2) as usize; // Account for borders
 
         // Update scroll to keep cursor visible
         self.update_scroll(table_height);
+        self.update_horizontal_scroll(viewport_width);
 
         let visible_start = self.scroll_offset;
+
+        // Calculate visible column range
+        let (visible_col_start, visible_col_end) = if self.horizontal_scroll_enabled {
+            // Calculate which columns fit in viewport
+            let mut total_width = 0;
+            let mut end = self.horizontal_scroll_offset;
+
+            for i in self.horizontal_scroll_offset..self.column_widths.len() {
+                total_width += self.column_widths[i] + 1; // +1 for separator
+                end = i + 1; // Always include current column
+                if total_width > viewport_width {
+                    break; // Break after including partially-visible column
+                }
+            }
+            (self.horizontal_scroll_offset, end)
+        } else {
+            (0, self.sheet_data.width())
+        };
 
         // Clone headers to avoid borrow issues
         let headers = self.sheet_data.headers().to_vec();
@@ -1158,6 +1262,8 @@ impl TuiState {
         let header_cells: Vec<Cell> = headers
             .iter()
             .enumerate()
+            .skip(visible_col_start)
+            .take(visible_col_end - visible_col_start)
             .map(|(col_idx, h)| {
                 let mut style = Style::default()
                     .fg(colors.header_fg)
@@ -1190,6 +1296,8 @@ impl TuiState {
                 let cells: Vec<Cell> = row
                     .iter()
                     .enumerate()
+                    .skip(visible_col_start)
+                    .take(visible_col_end - visible_col_start)
                     .map(|(col_idx, cell)| {
                         // Start with cell type color
                         let mut style = Style::default().fg(colors.cell_color(cell));
@@ -1242,11 +1350,20 @@ impl TuiState {
             .collect();
 
         // Calculate column widths
-        let sheet_width = self.sheet_data.width();
-        let col_widths: Vec<Constraint> = headers
-            .iter()
-            .map(|_| Constraint::Percentage((100 / sheet_width.max(1)) as u16))
-            .collect();
+        let col_widths: Vec<Constraint> = if self.horizontal_scroll_enabled {
+            // Use fixed widths based on content
+            self.column_widths[visible_col_start..visible_col_end]
+                .iter()
+                .map(|&w| Constraint::Length(w as u16))
+                .collect()
+        } else {
+            // Use percentage-based widths (current behavior)
+            let sheet_width = self.sheet_data.width();
+            headers
+                .iter()
+                .map(|_| Constraint::Percentage((100 / sheet_width.max(1)) as u16))
+                .collect()
+        };
 
         let table_title = if self.sheet_names.len() > 1 {
             format!(
@@ -1272,6 +1389,31 @@ impl TuiState {
         let (cell, _) = self.sheet_data.get_cell(self.cursor_row, self.cursor_col);
         let current_cell_value = cell.map(|v| v.to_string()).unwrap_or_default();
 
+        // Format sheet dimensions with scroll indicator
+        let sheet_dims = if self.horizontal_scroll_enabled && self.horizontal_scroll_offset > 0 {
+            let first_col = headers
+                .get(visible_col_start)
+                .map(|s| s.as_str())
+                .unwrap_or("?");
+            let last_col = headers
+                .get(visible_col_end.saturating_sub(1))
+                .map(|s| s.as_str())
+                .unwrap_or("?");
+            format!(
+                "{} rows × {} columns (showing {}-{})",
+                self.sheet_data.height(),
+                self.sheet_data.width(),
+                first_col,
+                last_col
+            )
+        } else {
+            format!(
+                "{} rows × {} columns",
+                self.sheet_data.height(),
+                self.sheet_data.width()
+            )
+        };
+
         let status_text = if let Some(ref progress) = self.progress {
             // Show progress indicator
             format!(" ⏳ {} ", progress.format())
@@ -1287,19 +1429,17 @@ impl TuiState {
             let match_info = format!("Match {}/{} | ", idx + 1, self.search_matches.len());
             if self.sheet_names.len() > 1 {
                 format!(
-                    " {} | {}n:next N:prev Esc:clear | {} rows × {} columns | Tab:next sheet ?:help q:quit ",
+                    " {} | {}n:next N:prev Esc:clear | {} | Tab:next sheet ?:help q:quit ",
                     match_info,
                     self.current_cell_address(),
-                    self.sheet_data.height(),
-                    self.sheet_data.width()
+                    sheet_dims
                 )
             } else {
                 format!(
-                    " {} | {}n:next N:prev Esc:clear | {} rows × {} columns | ?:help q:quit ",
+                    " {} | {}n:next N:prev Esc:clear | {} | ?:help q:quit ",
                     match_info,
                     self.current_cell_address(),
-                    self.sheet_data.height(),
-                    self.sheet_data.width()
+                    sheet_dims
                 )
             }
         } else {
@@ -1311,19 +1451,17 @@ impl TuiState {
 
             if self.sheet_names.len() > 1 {
                 format!(
-                    " {} | {} rows × {} columns{} | Theme: {} | t:theme /:search Tab:sheet ?:help q:quit ",
+                    " {} | {}{} | Theme: {} | t:theme /:search Tab:sheet ?:help q:quit ",
                     self.current_cell_address(),
-                    self.sheet_data.height(),
-                    self.sheet_data.width(),
+                    sheet_dims,
                     mode_indicator,
                     self.current_theme.name()
                 )
             } else {
                 format!(
-                    " {} | {} rows × {} columns{} | Theme: {} | t:theme /:search ?:help q:quit ",
+                    " {} | {}{} | Theme: {} | t:theme /:search ?:help q:quit ",
                     self.current_cell_address(),
-                    self.sheet_data.height(),
-                    self.sheet_data.width(),
+                    sheet_dims,
                     mode_indicator,
                     self.current_theme.name()
                 )
@@ -1890,7 +2028,12 @@ impl TuiState {
 }
 
 /// Run the TUI application
-pub fn run_tui(workbook: Workbook, sheet_name: &str, config: &crate::config::Config) -> Result<()> {
+pub fn run_tui(
+    workbook: Workbook,
+    sheet_name: &str,
+    config: &crate::config::Config,
+    horizontal_scroll: bool,
+) -> Result<()> {
     // Check if stdout is a TTY before attempting to use interactive mode
     use std::io::IsTerminal;
     if !io::stdout().is_terminal() {
@@ -1909,7 +2052,7 @@ pub fn run_tui(workbook: Workbook, sheet_name: &str, config: &crate::config::Con
     let mut terminal = Terminal::new(backend).context("Failed to initialize terminal backend")?;
 
     // Create app state
-    let mut app = TuiState::new(workbook, sheet_name, config)?;
+    let mut app = TuiState::new(workbook, sheet_name, config, horizontal_scroll)?;
 
     // Main event loop
     let res = run_event_loop(&mut terminal, &mut app);

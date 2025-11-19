@@ -78,6 +78,9 @@ xleak report.xlsx --sheet "Q3 Results" -i
 
 # View formulas by default
 xleak data.xlsx -i --formulas
+
+# Enable horizontal scrolling for wide files (auto-size columns)
+xleak wide-data.xlsx -i -H
 ```
 
 **TUI Keyboard Shortcuts:**

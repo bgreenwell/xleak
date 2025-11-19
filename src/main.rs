@@ -43,6 +43,10 @@ struct Cli {
     #[arg(short, long)]
     interactive: bool,
 
+    /// Enable horizontal scrolling in TUI mode (auto-size columns)
+    #[arg(short = 'H', long)]
+    horizontal_scroll: bool,
+
     /// Path to custom config file (default: $XDG_CONFIG_HOME/xleak/config.toml)
     #[arg(long, value_name = "PATH")]
     config: Option<PathBuf>,
@@ -96,7 +100,7 @@ fn main() -> Result<()> {
     // Display, export, or run TUI
     if cli.interactive {
         // Interactive TUI mode - pass the workbook so it can switch sheets
-        tui::run_tui(wb, &sheet_name, &config)?;
+        tui::run_tui(wb, &sheet_name, &config, cli.horizontal_scroll)?;
     } else {
         // Load the sheet data for non-interactive modes
         let data = wb

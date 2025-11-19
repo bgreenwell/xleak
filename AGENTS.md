@@ -152,11 +152,11 @@ When extending functionality:
 - ✅ Large file optimization with lazy loading (1000+ rows)
 - ✅ Multi-sheet navigation (Tab/Shift+Tab)
 - ✅ Jump to cell (Ctrl+G for addresses like A100, 10,5)
+- ✅ Horizontal scrolling with auto-sized columns (-H flag)
 
 ### Future Features (see .planning/ for any relevant documentation)
 - 🚧 Cell formatting visualization (colors, borders)
 - 🚧 Advanced filtering/sorting
-- 🚧 Column width auto-sizing
 - 🚧 Freeze panes support
 
 ### Dependencies
