@@ -992,10 +992,10 @@ impl TuiState {
 
         for i in self.horizontal_scroll_offset..self.column_widths.len() {
             total_width += self.column_widths[i] + 1; // +1 for separator
+            visible_end = i + 1; // Always include current column
             if total_width > viewport_width {
-                break;
+                break; // Break after including partially-visible column
             }
-            visible_end = i + 1;
         }
 
         // Scroll right if cursor is beyond visible area
@@ -1242,10 +1242,10 @@ impl TuiState {
 
             for i in self.horizontal_scroll_offset..self.column_widths.len() {
                 total_width += self.column_widths[i] + 1; // +1 for separator
+                end = i + 1; // Always include current column
                 if total_width > viewport_width {
-                    break;
+                    break; // Break after including partially-visible column
                 }
-                end = i + 1;
             }
             (self.horizontal_scroll_offset, end)
         } else {
