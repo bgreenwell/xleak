@@ -474,14 +474,14 @@ pub struct TuiState {
     current_sheet_index: usize,
     sheet_data: SheetDataSource,
     should_quit: bool,
-    cursor_row: usize,                // Current row (0-indexed in data)
-    cursor_col: usize,                // Current column (0-indexed)
-    scroll_offset: usize,             // Vertical scroll offset
-    horizontal_scroll_offset: usize,  // Horizontal scroll offset
-    horizontal_scroll_enabled: bool,  // Whether horizontal scrolling is enabled
-    column_widths: Vec<usize>,        // Cached column widths for horizontal scroll
-    show_help: bool,                  // Help overlay visible
-    show_cell_detail: bool,           // Cell detail popup visible
+    cursor_row: usize,               // Current row (0-indexed in data)
+    cursor_col: usize,               // Current column (0-indexed)
+    scroll_offset: usize,            // Vertical scroll offset
+    horizontal_scroll_offset: usize, // Horizontal scroll offset
+    horizontal_scroll_enabled: bool, // Whether horizontal scrolling is enabled
+    column_widths: Vec<usize>,       // Cached column widths for horizontal scroll
+    show_help: bool,                 // Help overlay visible
+    show_cell_detail: bool,          // Cell detail popup visible
     // Search state
     search_mode: bool,                   // Whether we're in search input mode
     search_query: String,                // Current search query
@@ -977,7 +977,7 @@ impl TuiState {
         }
 
         // Apply constraints: min 3 chars, max 30 chars
-        widths.iter().map(|&w| w.max(3).min(30)).collect()
+        widths.iter().map(|&w| w.clamp(3, 30)).collect()
     }
 
     /// Update horizontal scroll offset to keep cursor visible
@@ -1391,8 +1391,14 @@ impl TuiState {
 
         // Format sheet dimensions with scroll indicator
         let sheet_dims = if self.horizontal_scroll_enabled && self.horizontal_scroll_offset > 0 {
-            let first_col = headers.get(visible_col_start).map(|s| s.as_str()).unwrap_or("?");
-            let last_col = headers.get(visible_col_end.saturating_sub(1)).map(|s| s.as_str()).unwrap_or("?");
+            let first_col = headers
+                .get(visible_col_start)
+                .map(|s| s.as_str())
+                .unwrap_or("?");
+            let last_col = headers
+                .get(visible_col_end.saturating_sub(1))
+                .map(|s| s.as_str())
+                .unwrap_or("?");
             format!(
                 "{} rows × {} columns (showing {}-{})",
                 self.sheet_data.height(),
@@ -1401,7 +1407,11 @@ impl TuiState {
                 last_col
             )
         } else {
-            format!("{} rows × {} columns", self.sheet_data.height(), self.sheet_data.width())
+            format!(
+                "{} rows × {} columns",
+                self.sheet_data.height(),
+                self.sheet_data.width()
+            )
         };
 
         let status_text = if let Some(ref progress) = self.progress {
