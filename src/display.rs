@@ -1,6 +1,6 @@
 use crate::workbook::{CellValue, SheetData};
 use anyhow::Result;
-use prettytable::{Cell, Row, Table, format};
+use prettytable::{format, Cell, Row, Table};
 
 /// Format a cell value with width limiting
 fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
@@ -8,19 +8,30 @@ fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
         return value.to_string();
     }
 
+    let num_chars_to_take = 20;
+
     if wrap {
         // For now, wrapping is not fully implemented with prettytable
         // We'll truncate with a note. Full wrapping would require custom rendering.
         // Future: implement multi-line cell support
-        if max_width > 3 {
-            format!("{}...", &value[..max_width - 3])
+        if max_width > num_chars_to_take {
+            format!("{}...", &value[..max_width - num_chars_to_take])
         } else {
             value[..max_width].to_string()
         }
     } else {
+        // Tìm chỉ mục byte sau ký tự thứ 10
+        let end_byte_index = value
+            .char_indices()
+            .nth(num_chars_to_take)
+            .map(|(i, _)| i)
+            // Nếu chuỗi ngắn hơn 10 ký tự, lấy toàn bộ chiều dài byte
+            .unwrap_or(value.len());
         // Truncate with "..."
-        if max_width > 3 {
-            format!("{}...", &value[..max_width - 3])
+        if max_width > num_chars_to_take {
+            format!("{}...", &value[0..end_byte_index])
+
+            //value.to_string()
         } else {
             value[..max_width].to_string()
         }
