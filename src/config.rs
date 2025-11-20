@@ -221,7 +221,7 @@ fn parse_key_string(s: &str) -> Option<(KeyCode, KeyModifiers)> {
     }
 
     // Parse key code
-    let code = match key_part.to_lowercase().as_str() {
+    let code = match *key_part {
         "enter" => KeyCode::Enter,
         "esc" | "escape" => KeyCode::Esc,
         "tab" => KeyCode::Tab,
@@ -288,7 +288,7 @@ fn get_vim_keybinding(action: &str) -> Option<(KeyCode, KeyModifiers)> {
         "jump_to_top" => ("g", KeyModifiers::empty()),
         "jump_to_bottom" => ("G", KeyModifiers::SHIFT),
         "jump_to_row_start" => ("0", KeyModifiers::empty()),
-        "jump_to_row_end" => ("$", KeyModifiers::SHIFT),
+        "jump_to_row_end" => ("$", KeyModifiers::empty()),
         // VIM-style actions
         "quit" => ("q", KeyModifiers::empty()),
         "copy_cell" => ("y", KeyModifiers::empty()),
