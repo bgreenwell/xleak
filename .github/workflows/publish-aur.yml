@@ -75,6 +75,7 @@ jobs:
           sha256sums=("SHA256_PLACEHOLDER")
 
           package() {
+              cd "$srcdir/xleak-x86_64-unknown-linux-gnu"
               install -Dm755 xleak -t "$pkgdir/usr/bin"
               install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
           }
