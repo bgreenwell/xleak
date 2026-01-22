@@ -109,6 +109,13 @@ cargo install --path .
 
 **Requirements:** Rust 1.70 or later
 
+### Build Snap package from source
+
+- install Snapcraft: `sudo snap install snapcraft --classic`
+- `cd` to project root directory
+- run `snapcraft pack` to produce `*.snap` file (`--dangerous` to allow install outside Snap Store)
+- install it: `sudo snap install <NAME>.snap --dangerous` and test
+
 ## Usage
 
 ### Interactive TUI Mode (Recommended)

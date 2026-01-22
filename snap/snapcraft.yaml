@@ -1,0 +1,47 @@
+# To build Snap package of xleak
+#
+# - install Snapcraft: `sudo snap install snapcraft --classic`
+# - checkout project and `cd` to project root directory
+# - run `snapcraft pack` to package the project and produce `*.snap` file
+# - install it: `sudo snap install xleak_<VERSION>_amd64.snap --dangerous`
+# - run `xleak`
+#
+name: xleak
+base: core24
+version: '0.2.5'
+summary: Fast terminal Excel viewer with interactive TUI
+description: |
+  xleak is a terminal-based Excel viewer that allows you to inspect
+  spreadsheet files directly in the command line. Features include:
+  
+  - Interactive TUI mode with full keyboard navigation
+  - Multi-sheet support with seamless navigation
+  - Full-text search capabilities across cells
+  - Formula display in cell detail views
+  - Export to CSV, JSON, and plain text formats
+  - Clipboard support for copying cells and rows
+  - Support for .xlsx, .xls, .xlsm, .xlsb, .ods formats
+  
+  Project page: https://github.com/bgreenwell/xleak
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  xleak:
+    command: bin/xleak
+    plugs:
+      - home
+      - removable-media
+
+parts:
+  xleak:
+    plugin: rust
+    source: .
+    build-packages:
+      - libssl-dev
+      - pkg-config
+    rust-channel: stable
