@@ -12,7 +12,7 @@ categories = ["command-line-utilities", "visualization"]
 readme = "README.md"
 
 [dependencies]
-calamine = "0.26"
+calamine = "0.34"
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
 prettytable-rs = "0.10"
