@@ -15,7 +15,7 @@ readme = "README.md"
 calamine = "0.26"
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0"
-prettytable-rs = "0.10"
+comfy-table = "7.1"
 
 # TUI dependencies
 ratatui = "0.29"

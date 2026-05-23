@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use comfy_table::{Cell, CellAlignment, ColumnConstraint, ContentArrangement, Row, Table, Width};
 use std::path::PathBuf;
 
 mod config;
@@ -204,9 +205,6 @@ fn main() -> Result<()> {
 
 /// Display table data in terminal (default behavior)
 fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()> {
-    use prettytable::{Cell, Row, Table, format};
-
-    // Print header info
     println!("\n╔═════════════════════════════════════════════════╗");
     println!("║  xleak - Excel Table Viewer                     ║");
     println!("╚═════════════════════════════════════════════════╝");
@@ -219,19 +217,24 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
     );
     println!();
 
-    // Create prettytable
-    let mut pt = Table::new();
-    pt.set_format(*format::consts::FORMAT_BOX_CHARS);
+    let max_width = 30u16;
+    let mut table_obj = Table::new();
+    table_obj.set_content_arrangement(ContentArrangement::Dynamic);
+    table_obj.set_width(
+        (table.headers.len() as u16)
+            .saturating_mul(max_width + 3)
+            .max(max_width),
+    );
 
-    // Add headers
-    let header_cells: Vec<Cell> = table
-        .headers
-        .iter()
-        .map(|h| Cell::new(h).style_spec("Fgbc"))
-        .collect();
-    pt.set_titles(Row::new(header_cells));
+    let mut header_row = Row::new();
+    for h in &table.headers {
+        header_row.add_cell(Cell::new(h).add_attribute(comfy_table::Attribute::Bold));
+    }
+    table_obj.set_header(header_row);
+    table_obj.set_constraints(
+        (0..table.headers.len()).map(|_| ColumnConstraint::UpperBoundary(Width::Fixed(max_width))),
+    );
 
-    // Add data rows (limit if needed)
     let rows_to_show = if max_rows == 0 {
         table.rows.len()
     } else {
@@ -239,31 +242,24 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
     };
 
     for row in table.rows.iter().take(rows_to_show) {
-        let cells: Vec<Cell> = row
-            .iter()
-            .map(|cell| {
-                let cell_obj = Cell::new(&cell.to_string());
-                // Style based on type
-                match cell {
-                    workbook::CellValue::Int(_) | workbook::CellValue::Float(_) => {
-                        cell_obj.style_spec("Fr") // Right-aligned numbers
-                    }
-                    workbook::CellValue::Bool(_) => {
-                        cell_obj.style_spec("Fc") // Centered booleans
-                    }
-                    workbook::CellValue::Error(_) => {
-                        cell_obj.style_spec("Frc") // Red errors, centered
-                    }
-                    _ => cell_obj,
+        let mut table_row = Row::new();
+        for cell in row {
+            let cell_obj = match cell {
+                workbook::CellValue::Int(_) | workbook::CellValue::Float(_) => {
+                    Cell::new(cell.to_string()).set_alignment(CellAlignment::Right)
                 }
-            })
-            .collect();
-        pt.add_row(Row::new(cells));
+                workbook::CellValue::Bool(_) | workbook::CellValue::Error(_) => {
+                    Cell::new(cell.to_string()).set_alignment(CellAlignment::Center)
+                }
+                _ => Cell::new(cell.to_string()).set_alignment(CellAlignment::Left),
+            };
+            table_row.add_cell(cell_obj);
+        }
+        table_obj.add_row(table_row);
     }
 
-    pt.printstd();
+    println!("{}", table_obj);
 
-    // Show row count summary
     println!();
     if rows_to_show < table.rows.len() {
         println!(

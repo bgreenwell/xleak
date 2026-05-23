@@ -1,6 +1,8 @@
 use crate::workbook::{CellValue, SheetData};
 use anyhow::Result;
-use prettytable::{Cell, Row, Table, format};
+use comfy_table::{
+    Attribute, Cell, CellAlignment, ColumnConstraint, ContentArrangement, Row, Table, Width,
+};
 
 /// Format a cell value with width limiting
 fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
@@ -10,15 +12,8 @@ fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
     }
 
     if wrap {
-        // For now, wrapping is not fully implemented with prettytable
-        // We'll truncate with a note. Full wrapping would require custom rendering.
-        // Future: implement multi-line cell support
-        if max_width > 3 {
-            let truncated: String = value.chars().take(max_width - 3).collect();
-            format!("{}...", truncated)
-        } else {
-            value.chars().take(max_width).collect()
-        }
+        // Return full text; comfy-table handles the multi-line wrap based on column width
+        value.to_string()
     } else {
         // Truncate with "..."
         if max_width > 3 {
@@ -60,20 +55,25 @@ pub fn display_table(
         return Ok(());
     }
 
-    // Create table
     let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_BOX_CHARS);
+    if wrap {
+        let width = (data.width as u16)
+            .saturating_mul(max_width as u16 + 3)
+            .max(max_width as u16);
+        table
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_width(width);
+    }
 
-    // Add headers (with width limiting)
-    let header_cells: Vec<Cell> = data
-        .headers
-        .iter()
-        .map(|h| {
-            let formatted = format_cell_value(h, max_width, wrap);
-            Cell::new(&formatted).style_spec("Fgbc")
-        })
-        .collect();
-    table.set_titles(Row::new(header_cells));
+    let mut header_row = Row::new();
+    for h in &data.headers {
+        let formatted = format_cell_value(h, max_width, wrap);
+        header_row.add_cell(Cell::new(formatted).add_attribute(Attribute::Bold));
+    }
+    table.set_header(header_row);
+    table.set_constraints(
+        (0..data.width).map(|_| ColumnConstraint::UpperBoundary(Width::Fixed(max_width as u16))),
+    );
 
     // Add data rows (limit if needed)
     let rows_to_show = if max_rows == 0 {
@@ -83,48 +83,41 @@ pub fn display_table(
     };
 
     for (row_idx, row) in data.rows.iter().enumerate().take(rows_to_show) {
-        let cells: Vec<Cell> = row
-            .iter()
-            .enumerate()
-            .map(|(col_idx, cell)| {
-                // Get formula if it exists and show_formulas is true
-                let value = if show_formulas {
-                    data.formulas
-                        .get(row_idx)
-                        .and_then(|formula_row| formula_row.get(col_idx))
-                        .and_then(|f| f.as_ref())
-                        .cloned()
-                        .unwrap_or_else(|| cell.to_string())
-                } else {
-                    cell.to_string()
-                };
+        let mut table_row = Row::new();
+        for (col_idx, cell) in row.iter().enumerate() {
+            let value = if show_formulas {
+                data.formulas
+                    .get(row_idx)
+                    .and_then(|formula_row| formula_row.get(col_idx))
+                    .and_then(|f| f.as_ref())
+                    .cloned()
+                    .unwrap_or_else(|| cell.to_string())
+            } else {
+                cell.to_string()
+            };
 
-                let formatted = format_cell_value(&value, max_width, wrap);
-                let cell_obj = Cell::new(&formatted);
+            let formatted = format_cell_value(&value, max_width, wrap);
+            let mut cell_obj = Cell::new(formatted);
 
-                // Style based on type (only when not showing formulas)
-                if show_formulas {
-                    cell_obj.style_spec("Fg") // Green for formulas
-                } else {
-                    match cell {
-                        CellValue::Int(_) | CellValue::Float(_) => {
-                            cell_obj.style_spec("Fr") // Right-aligned numbers
-                        }
-                        CellValue::Bool(_) => {
-                            cell_obj.style_spec("Fc") // Centered booleans
-                        }
-                        CellValue::Error(_) => {
-                            cell_obj.style_spec("Frc") // Red errors, centered
-                        }
-                        _ => cell_obj,
+            // Alignment mapping
+            if !show_formulas {
+                cell_obj = match cell {
+                    CellValue::Int(_) | CellValue::Float(_) => {
+                        cell_obj.set_alignment(CellAlignment::Right)
                     }
-                }
-            })
-            .collect();
-        table.add_row(Row::new(cells));
+                    CellValue::Bool(_) => cell_obj.set_alignment(CellAlignment::Center),
+                    CellValue::Error(_) => cell_obj.set_alignment(CellAlignment::Center),
+                    _ => cell_obj.set_alignment(CellAlignment::Left),
+                };
+            } else {
+                cell_obj = cell_obj.set_alignment(CellAlignment::Left);
+            }
+            table_row.add_cell(cell_obj);
+        }
+        table.add_row(table_row);
     }
 
-    table.printstd();
+    println!("{}", table);
 
     // Show row count summary
     println!();
@@ -153,7 +146,6 @@ pub fn export_csv(data: &SheetData) -> Result<()> {
             .iter()
             .map(|cell| {
                 let val = cell.to_string();
-                // Quote if contains comma or quotes
                 if val.contains(',') || val.contains('"') {
                     format!("\"{}\"", val.replace('"', "\"\""))
                 } else {
