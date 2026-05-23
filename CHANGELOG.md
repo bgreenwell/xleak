@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- NetBSD installation via `pkgin install xleak` (thanks [@0323pin](https://github.com/0323pin)! [#40](https://github.com/bgreenwell/xleak/pull/40))
 - Automated AUR, WinGet, and Scoop publishing via GitHub Actions
 - Warn when formula cells are blank due to uncached xlsx values (`NOTE:` before table, suggests `--formulas` or re-saving in Excel/LibreOffice)
 
