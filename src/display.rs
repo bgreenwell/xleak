@@ -48,6 +48,42 @@ pub fn display_table(
     if all_sheets.len() > 1 {
         println!("Available sheets: {}", all_sheets.join(", "));
     }
+
+    if !show_formulas {
+        let has_formulas = data
+            .formulas
+            .iter()
+            .any(|row| row.iter().any(|f| f.is_some()));
+        if has_formulas {
+            let is_blank = |cell: &CellValue| match cell {
+                CellValue::Empty => true,
+                CellValue::String(s) => s.is_empty(),
+                _ => false,
+            };
+            let blank_formula_count: usize = data
+                .rows
+                .iter()
+                .enumerate()
+                .map(|(r, row)| {
+                    row.iter()
+                        .enumerate()
+                        .filter(|(c, cell)| {
+                            is_blank(cell)
+                                && data
+                                    .formulas
+                                    .get(r)
+                                    .and_then(|fr| fr.get(*c))
+                                    .and_then(|f| f.as_ref())
+                                    .is_some()
+                        })
+                        .count()
+                })
+                .sum();
+            if blank_formula_count >= 2 {
+                println!("NOTE: Formula cells empty (not cached). Try --formulas or opening/saving in Excel/LibreOffice to cache the results.");
+            }
+        }
+    }
     println!();
 
     if data.rows.is_empty() {
@@ -123,43 +159,6 @@ pub fn display_table(
     }
 
     println!("{}", table);
-
-    // Warn if formulas are present but all values are empty (uncached xlsx)
-    if !show_formulas {
-        let has_formulas = data
-            .formulas
-            .iter()
-            .any(|row| row.iter().any(|f| f.is_some()));
-        let is_blank = |cell: &CellValue| match cell {
-            CellValue::Empty => true,
-            CellValue::String(s) => s.is_empty(),
-            _ => false,
-        };
-        let blank_formula_count: usize = data
-            .rows
-            .iter()
-            .enumerate()
-            .map(|(r, row)| {
-                row.iter()
-                    .enumerate()
-                    .filter(|(c, cell)| {
-                        is_blank(cell)
-                            && data
-                                .formulas
-                                .get(r)
-                                .and_then(|fr| fr.get(*c))
-                                .and_then(|f| f.as_ref())
-                                .is_some()
-                    })
-                    .count()
-            })
-            .sum();
-        if has_formulas && blank_formula_count >= 2 {
-            println!(
-                "⚠️  Some formula cells are empty — open the file in Excel/LibreOffice and re-save to cache results, or use --formulas to view expressions."
-            );
-        }
-    }
 
     println!();
     if rows_to_show < data.rows.len() {
