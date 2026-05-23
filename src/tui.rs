@@ -1084,7 +1084,19 @@ impl TuiState {
         action: &str,
     ) -> bool {
         if let Some((expected_code, expected_mods)) = self.config.get_keybinding(action) {
-            code == expected_code && modifiers == expected_mods
+            if code != expected_code {
+                return false;
+            }
+            // Some terminals omit SHIFT for shifted symbol characters (e.g. '?', '$')
+            // because the shift is already encoded in the character itself. Strip SHIFT
+            // from both sides for non-alphabetic chars so bindings work consistently.
+            if let KeyCode::Char(c) = code
+                && !c.is_alphabetic()
+            {
+                let strip = crossterm::event::KeyModifiers::SHIFT;
+                return (modifiers - strip) == (expected_mods - strip);
+            }
+            modifiers == expected_mods
         } else {
             false
         }

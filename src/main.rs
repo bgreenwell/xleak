@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use comfy_table::{Cell, CellAlignment, ColumnConstraint, ContentArrangement, Row, Table, Width};
+use comfy_table::{
+    Attribute, Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, Width,
+};
 use std::path::PathBuf;
 
 mod config;
@@ -228,7 +230,11 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
 
     let mut header_row = Row::new();
     for h in &table.headers {
-        header_row.add_cell(Cell::new(h).add_attribute(comfy_table::Attribute::Bold));
+        header_row.add_cell(
+            Cell::new(h)
+                .add_attribute(Attribute::Bold)
+                .fg(Color::Green),
+        );
     }
     table_obj.set_header(header_row);
     table_obj.set_constraints(
@@ -248,9 +254,12 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
                 workbook::CellValue::Int(_) | workbook::CellValue::Float(_) => {
                     Cell::new(cell.to_string()).set_alignment(CellAlignment::Right)
                 }
-                workbook::CellValue::Bool(_) | workbook::CellValue::Error(_) => {
+                workbook::CellValue::Bool(_) => {
                     Cell::new(cell.to_string()).set_alignment(CellAlignment::Center)
                 }
+                workbook::CellValue::Error(_) => Cell::new(cell.to_string())
+                    .set_alignment(CellAlignment::Center)
+                    .fg(Color::Red),
                 _ => Cell::new(cell.to_string()).set_alignment(CellAlignment::Left),
             };
             table_row.add_cell(cell_obj);

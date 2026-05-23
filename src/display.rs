@@ -1,7 +1,7 @@
 use crate::workbook::{CellValue, SheetData};
 use anyhow::Result;
 use comfy_table::{
-    Attribute, Cell, CellAlignment, ColumnConstraint, ContentArrangement, Row, Table, Width,
+    Attribute, Cell, CellAlignment, Color, ColumnConstraint, ContentArrangement, Row, Table, Width,
 };
 
 /// Format a cell value with width limiting
@@ -68,7 +68,11 @@ pub fn display_table(
     let mut header_row = Row::new();
     for h in &data.headers {
         let formatted = format_cell_value(h, max_width, wrap);
-        header_row.add_cell(Cell::new(formatted).add_attribute(Attribute::Bold));
+        header_row.add_cell(
+            Cell::new(formatted)
+                .add_attribute(Attribute::Bold)
+                .fg(Color::Green),
+        );
     }
     table.set_header(header_row);
     table.set_constraints(
@@ -99,19 +103,20 @@ pub fn display_table(
             let formatted = format_cell_value(&value, max_width, wrap);
             let mut cell_obj = Cell::new(formatted);
 
-            // Alignment mapping
-            if !show_formulas {
-                cell_obj = match cell {
+            cell_obj = if show_formulas {
+                cell_obj.set_alignment(CellAlignment::Left).fg(Color::Green)
+            } else {
+                match cell {
                     CellValue::Int(_) | CellValue::Float(_) => {
                         cell_obj.set_alignment(CellAlignment::Right)
                     }
                     CellValue::Bool(_) => cell_obj.set_alignment(CellAlignment::Center),
-                    CellValue::Error(_) => cell_obj.set_alignment(CellAlignment::Center),
+                    CellValue::Error(_) => {
+                        cell_obj.set_alignment(CellAlignment::Center).fg(Color::Red)
+                    }
                     _ => cell_obj.set_alignment(CellAlignment::Left),
-                };
-            } else {
-                cell_obj = cell_obj.set_alignment(CellAlignment::Left);
-            }
+                }
+            };
             table_row.add_cell(cell_obj);
         }
         table.add_row(table_row);
@@ -119,7 +124,43 @@ pub fn display_table(
 
     println!("{}", table);
 
-    // Show row count summary
+    // Warn if formulas are present but all values are empty (uncached xlsx)
+    if !show_formulas {
+        let has_formulas = data
+            .formulas
+            .iter()
+            .any(|row| row.iter().any(|f| f.is_some()));
+        let is_blank = |cell: &CellValue| match cell {
+            CellValue::Empty => true,
+            CellValue::String(s) => s.is_empty(),
+            _ => false,
+        };
+        let blank_formula_count: usize = data
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(r, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter(|(c, cell)| {
+                        is_blank(cell)
+                            && data
+                                .formulas
+                                .get(r)
+                                .and_then(|fr| fr.get(*c))
+                                .and_then(|f| f.as_ref())
+                                .is_some()
+                    })
+                    .count()
+            })
+            .sum();
+        if has_formulas && blank_formula_count >= 2 {
+            println!(
+                "⚠️  Some formula cells are empty — open the file in Excel/LibreOffice and re-save to cache results, or use --formulas to view expressions."
+            );
+        }
+    }
+
     println!();
     if rows_to_show < data.rows.len() {
         println!(
