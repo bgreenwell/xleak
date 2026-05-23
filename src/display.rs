@@ -87,7 +87,9 @@ pub fn display_table(
                 } else {
                     "NOTE:".to_string()
                 };
-                println!("{prefix} Formula cells empty (not cached). Try --formulas or opening/saving in Excel/LibreOffice to cache the results.");
+                println!(
+                    "{prefix} Formula cells empty (not cached). Try --formulas or opening/saving in Excel/LibreOffice to cache the results."
+                );
             }
         }
     }

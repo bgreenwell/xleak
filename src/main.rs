@@ -230,11 +230,7 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
 
     let mut header_row = Row::new();
     for h in &table.headers {
-        header_row.add_cell(
-            Cell::new(h)
-                .add_attribute(Attribute::Bold)
-                .fg(Color::Green),
-        );
+        header_row.add_cell(Cell::new(h).add_attribute(Attribute::Bold).fg(Color::Green));
     }
     table_obj.set_header(header_row);
     table_obj.set_constraints(
