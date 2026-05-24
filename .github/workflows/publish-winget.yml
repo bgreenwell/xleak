@@ -37,6 +37,11 @@ jobs:
       - name: Install komac binary
         run: cargo binstall komac -y
 
+      - name: Sync WinGet fork
+        run: komac sync
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
       - name: Publish to WinGet with Komac
         run: |
           komac update bgreenwell.xleak \
