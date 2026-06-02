@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fix clipboard copy on pure-Wayland Linux setups (e.g., niri, sway) by enabling arboard's `wayland-data-control` feature ([#45](https://github.com/bgreenwell/xleak/issues/45))
+
 ## [0.2.6] - 2026-05-24
 
 ### Added

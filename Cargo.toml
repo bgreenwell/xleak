@@ -25,7 +25,7 @@ crossterm = "0.28"
 chrono = "0.4"
 
 # Clipboard support
-arboard = "3.4"
+arboard = { version = "3.4", features = ["wayland-data-control"] }
 
 # Configuration file support
 serde = { version = "1.0", features = ["derive"] }
