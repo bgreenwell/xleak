@@ -56,6 +56,16 @@ scoop install xleak
 winget install bgreenwell.xleak
 ```
 
+**Debian/Ubuntu**
+
+`xleak` is officially packaged for Debian as
+[`rust-xleak`](https://tracker.debian.org/pkg/rust-xleak) and is
+available in Forky or later:
+
+```bash
+sudo apt install xleak
+```
+
 **Arch Linux (AUR):**
 ```bash
 # Using yay
