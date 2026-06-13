@@ -287,7 +287,7 @@ xleak --config /path/to/config.toml file.xlsx -i
 default = "Dracula"
 ```
 
-**Available themes:**
+**Built-in themes:**
 - `"Default"` - Clean light theme with subtle colors
 - `"Dracula"` - Popular dark theme with purple accents
 - `"Solarized Dark"` - Precision colors for machines and people
@@ -295,7 +295,33 @@ default = "Dracula"
 - `"GitHub Dark"` - GitHub's dark color scheme
 - `"Nord"` - Arctic, north-bluish color palette
 
-Press `t` in interactive mode to cycle through themes at runtime.
+Press `t` in interactive mode to cycle through themes at runtime. Use `--theme` to select a theme from the command line:
+
+```bash
+xleak --theme "Nord" file.xlsx -i
+```
+
+#### Custom Themes
+
+Define custom themes in your config file using `[[theme.custom]]`. Colors can be specified as `#RRGGBB` hex or named colors (`red`, `cyan`, `white`, etc.).
+
+```toml
+[[theme.custom]]
+name = "tokyonight"
+inherits = "Dracula"
+foreground = "#c0caf5"
+background = "#1a1b26"
+header_fg = "#7aa2f7"
+border_fg = "#565f89"
+```
+
+**Inheritance:** Use `inherits` to base a custom theme on any built-in or custom theme. Only specify the fields you want to change — everything else is inherited.
+
+**Aliases:** `foreground` and `background` let you set a theme's base palette in two lines instead of nineteen. Search highlight colors are excluded because they need to contrast with the rest of the theme, not match it. Specific fields like `string_fg` override aliases when you need fine-grained control. See `config.toml.example` for which fields each alias covers.
+
+**Override built-ins:** A custom theme with the same name as a built-in replaces it.
+
+See `config.toml.example` for the full list of available color fields.
 
 #### UI Settings
 

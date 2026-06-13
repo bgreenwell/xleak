@@ -37,6 +37,8 @@ cargo install --path .                                      # install globally
 - **New export format:** `export_<format>()` in `display.rs`, match arm in `main()`
 - **Fix display:** `display_table()` in `display.rs`, test with DataTypes sheet
 - **New cell type:** `CellValue` enum in `workbook.rs`, impl `Display`, update `datatype_to_cellvalue()`
+- **New built-in theme:** add factory method on `ColorScheme` in `tui.rs`, add entry to `builtin_themes()`
+- **Custom themes:** `[[theme.custom]]` in config.toml, parsed via `CustomTheme` in `config.rs`, resolved by `resolve_themes()` in `tui.rs`. Supports `inherits`, `foreground`/`background` aliases, and all 19 `ColorScheme` fields
 
 ## Development
 

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use crossterm::event::{KeyCode, KeyModifiers};
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -21,6 +22,107 @@ pub struct Config {
 pub struct ThemeConfig {
     /// Default theme to use on startup
     pub default: String,
+    /// Custom theme definitions
+    #[serde(default, skip_serializing)]
+    pub custom: Vec<CustomTheme>,
+}
+
+/// A user-defined custom theme from `[[theme.custom]]` in config.toml
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CustomTheme {
+    pub name: String,
+    pub inherits: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub foreground: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub background: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub string_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub number_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub bool_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub datetime_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub error_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub empty_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub header_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub header_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_cell_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_cell_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_row_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_col_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub alternating_row_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub search_match_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub search_match_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_search_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub current_search_bg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub border_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub status_bar_fg: Option<Color>,
+    #[serde(default, deserialize_with = "deserialize_opt_color")]
+    pub status_bar_bg: Option<Color>,
+}
+
+/// 3-digit hex shorthand (#fff) is not supported.
+fn parse_color(s: &str) -> Option<Color> {
+    let s = s.trim();
+    if let Some(hex) = s.strip_prefix('#') {
+        if hex.len() == 6 {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            return Some(Color::Rgb(r, g, b));
+        }
+        return None;
+    }
+    match s.to_lowercase().replace([' ', '_', '-'], "").as_str() {
+        "black" => Some(Color::Black),
+        "red" => Some(Color::Red),
+        "green" => Some(Color::Green),
+        "yellow" => Some(Color::Yellow),
+        "blue" => Some(Color::Blue),
+        "magenta" => Some(Color::Magenta),
+        "cyan" => Some(Color::Cyan),
+        "gray" | "grey" => Some(Color::Gray),
+        "darkgray" | "darkgrey" => Some(Color::DarkGray),
+        "lightred" => Some(Color::LightRed),
+        "lightgreen" => Some(Color::LightGreen),
+        "lightyellow" => Some(Color::LightYellow),
+        "lightblue" => Some(Color::LightBlue),
+        "lightmagenta" => Some(Color::LightMagenta),
+        "lightcyan" => Some(Color::LightCyan),
+        "white" => Some(Color::White),
+        _ => None,
+    }
+}
+
+fn deserialize_opt_color<'de, D>(deserializer: D) -> std::result::Result<Option<Color>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => parse_color(&s)
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid color: '{s}'"))),
+    }
 }
 
 /// UI configuration
@@ -48,6 +150,7 @@ impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
             default: "Default".to_string(),
+            custom: Vec::new(),
         }
     }
 }
@@ -577,5 +680,95 @@ page_up = "Ctrl+b"
             config.get_keybinding("search"),
             Some((KeyCode::Char('/'), KeyModifiers::empty()))
         );
+    }
+
+    // =========================================================================
+    // Color Parsing Tests
+    // =========================================================================
+
+    #[test]
+    fn test_parse_color_hex() {
+        assert_eq!(parse_color("#ff0000"), Some(Color::Rgb(255, 0, 0)));
+        assert_eq!(parse_color("#00ff00"), Some(Color::Rgb(0, 255, 0)));
+        assert_eq!(parse_color("#0000ff"), Some(Color::Rgb(0, 0, 255)));
+        assert_eq!(parse_color("#1a1b26"), Some(Color::Rgb(26, 27, 38)));
+    }
+
+    #[test]
+    fn test_parse_color_named() {
+        assert_eq!(parse_color("red"), Some(Color::Red));
+        assert_eq!(parse_color("cyan"), Some(Color::Cyan));
+        assert_eq!(parse_color("White"), Some(Color::White));
+        assert_eq!(parse_color("dark_gray"), Some(Color::DarkGray));
+        assert_eq!(parse_color("DarkGray"), Some(Color::DarkGray));
+        assert_eq!(parse_color("light-yellow"), Some(Color::LightYellow));
+    }
+
+    #[test]
+    fn test_parse_color_invalid() {
+        assert_eq!(parse_color("#fff"), None);
+        assert_eq!(parse_color("#gggggg"), None);
+        assert_eq!(parse_color("notacolor"), None);
+        assert_eq!(parse_color(""), None);
+    }
+
+    // =========================================================================
+    // Custom Theme Config Tests
+    // =========================================================================
+
+    #[test]
+    fn test_custom_theme_parsing() {
+        let config_str = r##"
+[theme]
+default = "tokyonight"
+
+[[theme.custom]]
+name = "tokyonight"
+inherits = "Dracula"
+foreground = "#c0caf5"
+background = "#1a1b26"
+header_fg = "#7aa2f7"
+"##;
+        let config: Config = toml::from_str(config_str).unwrap();
+        assert_eq!(config.theme.default, "tokyonight");
+        assert_eq!(config.theme.custom.len(), 1);
+        assert_eq!(config.theme.custom[0].name, "tokyonight");
+        assert_eq!(config.theme.custom[0].inherits.as_deref(), Some("Dracula"));
+        assert_eq!(
+            config.theme.custom[0].foreground,
+            Some(Color::Rgb(192, 202, 245))
+        );
+        assert_eq!(
+            config.theme.custom[0].header_fg,
+            Some(Color::Rgb(122, 162, 247))
+        );
+    }
+
+    #[test]
+    fn test_invalid_color_in_theme() {
+        let config_str = r#"
+[theme]
+default = "Default"
+
+[[theme.custom]]
+name = "bad"
+foreground = "notacolor"
+"#;
+        let result: std::result::Result<Config, _> = toml::from_str(config_str);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unknown_field_rejected() {
+        let config_str = r#"
+[theme]
+default = "Default"
+
+[[theme.custom]]
+name = "typo"
+forground = "red"
+"#;
+        let result: std::result::Result<Config, _> = toml::from_str(config_str);
+        assert!(result.is_err());
     }
 }
