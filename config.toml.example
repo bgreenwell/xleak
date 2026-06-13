@@ -22,8 +22,9 @@
 [theme]
 # Default theme to use on startup
 # Press 't' in interactive mode to cycle through themes at runtime
+# Override with CLI flag: xleak --theme "Nord" file.xlsx -i
 #
-# Available themes:
+# Built-in themes:
 #   "Default"         - Clean light theme with subtle colors
 #   "Dracula"         - Popular dark theme with purple accents
 #   "Solarized Dark"  - Precision colors for machines and people
@@ -31,6 +32,46 @@
 #   "GitHub Dark"     - GitHub's dark color scheme
 #   "Nord"            - Arctic, north-bluish color palette
 default = "Default"
+
+# -----------------------------------------------------------------------------
+# Custom Themes (optional)
+# -----------------------------------------------------------------------------
+# Define custom themes with [[theme.custom]]. Custom themes with the same name
+# as a built-in theme will override it. Press 't' to cycle through all themes.
+#
+# Color values: "#RRGGBB" hex or named colors (red, cyan, blue, white, etc.)
+# Aliases:
+#   "foreground" sets: string_fg, number_fg, bool_fg, datetime_fg, error_fg,
+#                      empty_fg, header_fg, border_fg, status_bar_fg
+#   "background" sets: header_bg, alternating_row_bg, status_bar_bg
+#   Selection and search colors are excluded — they need independent contrast.
+# Specific fields (e.g. string_fg) override aliases.
+# All fields are optional when using "inherits" — unset fields are inherited.
+# If a custom theme inherits another custom theme, the parent must appear first.
+#
+# Available color fields:
+#   Cell types: string_fg, number_fg, bool_fg, datetime_fg, error_fg, empty_fg
+#   UI:         header_fg, header_bg, current_cell_fg, current_cell_bg,
+#               current_row_bg, current_col_fg, alternating_row_bg
+#   Search:     search_match_fg, search_match_bg, current_search_fg,
+#               current_search_bg
+#   Chrome:     border_fg, status_bar_fg, status_bar_bg
+
+# [[theme.custom]]
+# name = "tokyonight"
+# inherits = "Dracula"
+# foreground = "#c0caf5"
+# background = "#1a1b26"
+# header_fg = "#7aa2f7"
+# border_fg = "#565f89"
+
+# [[theme.custom]]
+# name = "matrix"
+# inherits = "Default"
+# foreground = "#00ff41"
+# background = "#0a0a0a"
+# header_fg = "#00cc33"
+# border_fg = "#003300"
 
 # =============================================================================
 # UI SETTINGS
@@ -175,3 +216,20 @@ profile = "default"
 # [keybindings.custom]
 # page_up = "Ctrl+b"      # Override vim's Ctrl+u
 # page_down = "Ctrl+f"    # Override vim's Ctrl+d
+
+# Example 5: Custom theme with system-wide theme switching
+# ----------------------------------------------------------
+# [theme]
+# default = "tokyonight"
+#
+# [[theme.custom]]
+# name = "tokyonight"
+# inherits = "Dracula"
+# foreground = "#c0caf5"
+# background = "#1a1b26"
+# header_fg = "#7aa2f7"
+# current_cell_bg = "#33467c"
+# border_fg = "#565f89"
+#
+# Then launch with: xleak --theme tokyonight file.xlsx -i
+

@@ -16,60 +16,147 @@ use ratatui::{
 use std::io;
 use std::time::{Duration, Instant};
 
-/// Available themes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Theme {
-    Default,
-    Dracula,
-    SolarizedDark,
-    SolarizedLight,
-    GitHubDark,
-    Nord,
+/// A named color scheme
+#[derive(Debug, Clone)]
+pub struct NamedTheme {
+    pub name: String,
+    pub colors: ColorScheme,
 }
 
-impl Theme {
-    /// Get all available themes
-    pub fn all() -> &'static [Theme] {
-        &[
-            Theme::Default,
-            Theme::Dracula,
-            Theme::SolarizedDark,
-            Theme::SolarizedLight,
-            Theme::GitHubDark,
-            Theme::Nord,
-        ]
-    }
+/// Returns the built-in themes in display order
+pub fn builtin_themes() -> Vec<NamedTheme> {
+    vec![
+        NamedTheme {
+            name: "Default".into(),
+            colors: ColorScheme::default_theme(),
+        },
+        NamedTheme {
+            name: "Dracula".into(),
+            colors: ColorScheme::dracula(),
+        },
+        NamedTheme {
+            name: "Solarized Dark".into(),
+            colors: ColorScheme::solarized_dark(),
+        },
+        NamedTheme {
+            name: "Solarized Light".into(),
+            colors: ColorScheme::solarized_light(),
+        },
+        NamedTheme {
+            name: "GitHub Dark".into(),
+            colors: ColorScheme::github_dark(),
+        },
+        NamedTheme {
+            name: "Nord".into(),
+            colors: ColorScheme::nord(),
+        },
+    ]
+}
 
-    /// Get the next theme in the cycle
-    pub fn next(&self) -> Theme {
-        let themes = Self::all();
-        let current_idx = themes.iter().position(|t| t == self).unwrap_or(0);
-        themes[(current_idx + 1) % themes.len()]
-    }
+/// Resolve custom themes from config and merge with built-ins.
+/// Customs are resolved in config order — if theme B inherits theme A,
+/// A must appear before B in `[[theme.custom]]`.
+pub fn resolve_themes(custom_themes: &[crate::config::CustomTheme]) -> Result<Vec<NamedTheme>> {
+    let mut themes = builtin_themes();
 
-    /// Get theme name for display
-    pub fn name(&self) -> &'static str {
-        match self {
-            Theme::Default => "Default",
-            Theme::Dracula => "Dracula",
-            Theme::SolarizedDark => "Solarized Dark",
-            Theme::SolarizedLight => "Solarized Light",
-            Theme::GitHubDark => "GitHub Dark",
-            Theme::Nord => "Nord",
+    for custom in custom_themes {
+        let base = resolve_base(&themes, custom)?;
+        let colors = apply_custom_fields(base, custom);
+        let needle = custom.name.to_lowercase().replace(' ', "");
+        if let Some(existing) = themes
+            .iter_mut()
+            .find(|t| t.name.to_lowercase().replace(' ', "") == needle)
+        {
+            existing.colors = colors;
+        } else {
+            themes.push(NamedTheme {
+                name: custom.name.clone(),
+                colors,
+            });
         }
     }
 
-    /// Get the color scheme for this theme
-    pub fn colors(&self) -> ColorScheme {
-        match self {
-            Theme::Default => ColorScheme::default_theme(),
-            Theme::Dracula => ColorScheme::dracula(),
-            Theme::SolarizedDark => ColorScheme::solarized_dark(),
-            Theme::SolarizedLight => ColorScheme::solarized_light(),
-            Theme::GitHubDark => ColorScheme::github_dark(),
-            Theme::Nord => ColorScheme::nord(),
-        }
+    Ok(themes)
+}
+
+fn resolve_base(themes: &[NamedTheme], custom: &crate::config::CustomTheme) -> Result<ColorScheme> {
+    let Some(ref parent_name) = custom.inherits else {
+        return Ok(ColorScheme::default_theme());
+    };
+
+    let needle = parent_name.to_lowercase().replace(' ', "");
+    let theme = themes
+        .iter()
+        .find(|t| t.name.to_lowercase().replace(' ', "") == needle)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Theme '{}' referenced in 'inherits' not found. \
+                 If it's a custom theme, make sure it appears earlier in [[theme.custom]].",
+                parent_name
+            )
+        })?;
+
+    Ok(theme.colors.clone())
+}
+
+fn apply_custom_fields(
+    mut colors: ColorScheme,
+    custom: &crate::config::CustomTheme,
+) -> ColorScheme {
+    if let Some(fg) = custom.foreground {
+        colors.string_fg = fg;
+        colors.number_fg = fg;
+        colors.bool_fg = fg;
+        colors.datetime_fg = fg;
+        colors.error_fg = fg;
+        colors.empty_fg = fg;
+        colors.header_fg = fg;
+        colors.border_fg = fg;
+        colors.status_bar_fg = fg;
     }
+    if let Some(bg) = custom.background {
+        colors.header_bg = Some(bg);
+        colors.alternating_row_bg = Some(bg);
+        colors.status_bar_bg = Some(bg);
+    }
+
+    macro_rules! apply {
+        ($field:ident) => {
+            if let Some(c) = custom.$field {
+                colors.$field = c;
+            }
+        };
+    }
+    macro_rules! apply_opt {
+        ($field:ident) => {
+            if let Some(c) = custom.$field {
+                colors.$field = Some(c);
+            }
+        };
+    }
+
+    apply!(string_fg);
+    apply!(number_fg);
+    apply!(bool_fg);
+    apply!(datetime_fg);
+    apply!(error_fg);
+    apply!(empty_fg);
+    apply!(header_fg);
+    apply_opt!(header_bg);
+    apply!(current_cell_fg);
+    apply!(current_cell_bg);
+    apply!(current_row_bg);
+    apply!(current_col_fg);
+    apply_opt!(alternating_row_bg);
+    apply!(search_match_fg);
+    apply!(search_match_bg);
+    apply!(current_search_fg);
+    apply!(current_search_bg);
+    apply!(border_fg);
+    apply!(status_bar_fg);
+    apply_opt!(status_bar_bg);
+
+    colors
 }
 
 /// Color scheme for the TUI
@@ -304,6 +391,33 @@ impl ColorScheme {
     }
 
     /// Get foreground color for a cell based on its value type
+    pub fn uses_rgb(&self) -> bool {
+        let colors = [
+            self.string_fg,
+            self.number_fg,
+            self.bool_fg,
+            self.datetime_fg,
+            self.error_fg,
+            self.empty_fg,
+            self.header_fg,
+            self.current_cell_fg,
+            self.current_cell_bg,
+            self.current_row_bg,
+            self.current_col_fg,
+            self.search_match_fg,
+            self.search_match_bg,
+            self.current_search_fg,
+            self.current_search_bg,
+            self.border_fg,
+            self.status_bar_fg,
+        ];
+        let opt_colors = [self.header_bg, self.alternating_row_bg, self.status_bar_bg];
+        colors.iter().any(|c| matches!(c, Color::Rgb(_, _, _)))
+            || opt_colors
+                .iter()
+                .any(|c| matches!(c, Some(Color::Rgb(_, _, _))))
+    }
+
     pub fn cell_color(&self, cell: &CellValue) -> Color {
         match cell {
             CellValue::Empty => self.empty_fg,
@@ -492,7 +606,8 @@ pub struct TuiState {
     // Progress state
     progress: Option<ProgressInfo>, // Current operation progress
     // Theme state
-    current_theme: Theme, // Current color theme
+    themes: Vec<NamedTheme>,
+    current_theme_idx: usize,
     // Config state
     config: crate::config::Config, // User configuration
 }
@@ -556,9 +671,19 @@ impl TuiState {
             jump_input: String::new(),
             copy_feedback: None,
             progress: None,
-            current_theme: Self::parse_theme_name(&config.theme.default),
+            themes: resolve_themes(&config.theme.custom)?,
+            current_theme_idx: 0,
             config: config.clone(),
         };
+
+        if let Some(idx) = state.find_theme_index(&config.theme.default) {
+            state.current_theme_idx = idx;
+        } else {
+            eprintln!(
+                "Warning: theme '{}' not found, using 'Default'",
+                config.theme.default
+            );
+        }
 
         // Calculate column widths if horizontal scrolling is enabled
         if horizontal_scroll {
@@ -568,16 +693,12 @@ impl TuiState {
         Ok(state)
     }
 
-    /// Parse theme name from config string
-    fn parse_theme_name(name: &str) -> Theme {
-        match name.to_lowercase().as_str() {
-            "dracula" => Theme::Dracula,
-            "solarized dark" | "solarizeddark" => Theme::SolarizedDark,
-            "solarized light" | "solarizedlight" => Theme::SolarizedLight,
-            "github dark" | "githubdark" => Theme::GitHubDark,
-            "nord" => Theme::Nord,
-            _ => Theme::Default, // Fallback to default for unknown themes
-        }
+    /// Find a theme index by name (case-insensitive, ignoring spaces)
+    fn find_theme_index(&self, name: &str) -> Option<usize> {
+        let needle = name.to_lowercase().replace(' ', "");
+        self.themes
+            .iter()
+            .position(|t| t.name.to_lowercase().replace(' ', "") == needle)
     }
 
     fn current_sheet_name(&self) -> &str {
@@ -1194,7 +1315,7 @@ impl TuiState {
             } else if self.key_matches(code, modifiers, "help") {
                 self.show_help = true;
             } else if self.key_matches(code, modifiers, "theme_toggle") {
-                self.current_theme = self.current_theme.next();
+                self.current_theme_idx = (self.current_theme_idx + 1) % self.themes.len();
             } else if self.key_matches(code, modifiers, "search") {
                 self.search_mode = true;
                 self.clear_search();
@@ -1288,7 +1409,7 @@ impl TuiState {
         let headers = self.sheet_data.headers().to_vec();
 
         // Get theme colors
-        let colors = self.current_theme.colors();
+        let colors = &self.themes[self.current_theme_idx].colors;
 
         // Build table rows with highlighting
         let header_cells: Vec<Cell> = headers
@@ -1487,7 +1608,7 @@ impl TuiState {
                     self.current_cell_address(),
                     sheet_dims,
                     mode_indicator,
-                    self.current_theme.name()
+                    self.themes[self.current_theme_idx].name
                 )
             } else {
                 format!(
@@ -1495,7 +1616,7 @@ impl TuiState {
                     self.current_cell_address(),
                     sheet_dims,
                     mode_indicator,
-                    self.current_theme.name()
+                    self.themes[self.current_theme_idx].name
                 )
             }
         };
@@ -2089,6 +2210,7 @@ pub fn run_tui(
     sheet_name: &str,
     config: &crate::config::Config,
     horizontal_scroll: bool,
+    theme_override: Option<&str>,
 ) -> Result<()> {
     // Check if stdout is a TTY before attempting to use interactive mode
     use std::io::IsTerminal;
@@ -2109,6 +2231,30 @@ pub fn run_tui(
 
     // Create app state
     let mut app = TuiState::new(workbook, sheet_name, config, horizontal_scroll)?;
+
+    if let Some(name) = theme_override {
+        if let Some(idx) = app.find_theme_index(name) {
+            app.current_theme_idx = idx;
+        } else {
+            let available: Vec<&str> = app.themes.iter().map(|t| t.name.as_str()).collect();
+            anyhow::bail!(
+                "Theme '{}' not found. Available themes: {}",
+                name,
+                available.join(", ")
+            );
+        }
+    }
+
+    if app.themes[app.current_theme_idx].colors.uses_rgb() {
+        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+        if colorterm != "truecolor" && colorterm != "24bit" {
+            eprintln!(
+                "Warning: your terminal may not support truecolor (COLORTERM is not set). \
+                 If colors look wrong, try a truecolor terminal (iTerm2, WezTerm, Alacritty) \
+                 or use a theme with named colors only."
+            );
+        }
+    }
 
     // Main event loop
     let res = run_event_loop(&mut terminal, &mut app);
@@ -2210,5 +2356,129 @@ mod tests {
         assert_eq!(col_to_letter(col_a), "A");
         assert_eq!(col_to_letter(col_z), "Z");
         assert_eq!(col_to_letter(col_aa), "AA");
+    }
+
+    // =========================================================================
+    // Theme Resolution Tests
+    // =========================================================================
+
+    #[test]
+    fn test_resolve_themes_no_customs() {
+        let themes = resolve_themes(&[]).unwrap();
+        assert!(!themes.is_empty());
+        assert_eq!(themes[0].name, "Default");
+    }
+
+    #[test]
+    fn test_resolve_themes_overrides_builtin() {
+        let custom = crate::config::CustomTheme {
+            name: "Dracula".into(),
+            inherits: Some("Dracula".into()),
+            string_fg: Some(Color::Green),
+            ..Default::default()
+        };
+        let themes = resolve_themes(&[custom]).unwrap();
+        assert_eq!(themes.len(), 6);
+        assert_eq!(themes[1].name, "Dracula");
+        assert_eq!(themes[1].colors.string_fg, Color::Green);
+        assert_eq!(themes[1].colors.number_fg, Color::Rgb(189, 147, 249));
+    }
+
+    #[test]
+    fn test_resolve_themes_inherits_missing() {
+        let custom = crate::config::CustomTheme {
+            name: "Bad".into(),
+            inherits: Some("NonExistent".into()),
+            ..Default::default()
+        };
+        let result = resolve_themes(&[custom]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_resolve_themes_foreground_alias_with_override() {
+        let custom = crate::config::CustomTheme {
+            name: "AliasTest".into(),
+            inherits: Some("Default".into()),
+            foreground: Some(Color::Blue),
+            string_fg: Some(Color::Red),
+            ..Default::default()
+        };
+        let themes = resolve_themes(&[custom]).unwrap();
+        let t = &themes[6];
+        assert_eq!(t.colors.number_fg, Color::Blue);
+        assert_eq!(t.colors.header_fg, Color::Blue);
+        assert_eq!(t.colors.border_fg, Color::Blue);
+        assert_eq!(t.colors.string_fg, Color::Red);
+    }
+
+    #[test]
+    fn test_resolve_themes_background_alias() {
+        let custom = crate::config::CustomTheme {
+            name: "BgTest".into(),
+            inherits: Some("Default".into()),
+            background: Some(Color::Rgb(10, 10, 10)),
+            current_row_bg: Some(Color::Rgb(30, 30, 30)),
+            ..Default::default()
+        };
+        let themes = resolve_themes(&[custom]).unwrap();
+        let t = &themes[6];
+        assert_eq!(t.colors.header_bg, Some(Color::Rgb(10, 10, 10)));
+        assert_eq!(t.colors.alternating_row_bg, Some(Color::Rgb(10, 10, 10)));
+        assert_eq!(t.colors.status_bar_bg, Some(Color::Rgb(10, 10, 10)));
+        assert_eq!(t.colors.current_row_bg, Color::Rgb(30, 30, 30));
+    }
+
+    #[test]
+    fn test_aliases_preserve_selection_contrast() {
+        let custom = crate::config::CustomTheme {
+            name: "NavTest".into(),
+            inherits: Some("Default".into()),
+            foreground: Some(Color::Rgb(192, 202, 245)),
+            background: Some(Color::Rgb(26, 27, 38)),
+            ..Default::default()
+        };
+        let themes = resolve_themes(&[custom]).unwrap();
+        let t = &themes[6];
+        assert_ne!(t.colors.current_row_bg, Color::Rgb(26, 27, 38));
+        assert_ne!(t.colors.current_cell_bg, Color::Rgb(26, 27, 38));
+        assert_ne!(t.colors.current_cell_fg, Color::Rgb(192, 202, 245));
+        assert_ne!(t.colors.current_col_fg, Color::Rgb(192, 202, 245));
+    }
+
+    #[test]
+    fn test_uses_rgb() {
+        let named_only = ColorScheme {
+            string_fg: Color::White,
+            number_fg: Color::Cyan,
+            bool_fg: Color::Magenta,
+            datetime_fg: Color::Green,
+            error_fg: Color::Red,
+            empty_fg: Color::DarkGray,
+            header_fg: Color::Yellow,
+            header_bg: None,
+            current_cell_fg: Color::White,
+            current_cell_bg: Color::Blue,
+            current_row_bg: Color::DarkGray,
+            current_col_fg: Color::Cyan,
+            alternating_row_bg: None,
+            search_match_fg: Color::Black,
+            search_match_bg: Color::Yellow,
+            current_search_fg: Color::Black,
+            current_search_bg: Color::Yellow,
+            border_fg: Color::White,
+            status_bar_fg: Color::White,
+            status_bar_bg: None,
+        };
+        assert!(!named_only.uses_rgb());
+
+        let mut with_rgb = named_only.clone();
+        with_rgb.string_fg = Color::Rgb(255, 0, 0);
+        assert!(with_rgb.uses_rgb());
+
+        let mut with_rgb_opt = named_only.clone();
+        with_rgb_opt.header_bg = Some(Color::Rgb(10, 10, 10));
+        assert!(with_rgb_opt.uses_rgb());
     }
 }

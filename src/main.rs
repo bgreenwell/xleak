@@ -61,6 +61,10 @@ struct Cli {
     /// Extract a specific Excel table by name (.xlsx only)
     #[arg(short = 't', long, value_name = "TABLE")]
     table: Option<String>,
+
+    /// Color theme to use (overrides config file default)
+    #[arg(long, value_name = "THEME")]
+    theme: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -167,7 +171,13 @@ fn main() -> Result<()> {
     // Display, export, or run TUI
     if cli.interactive {
         // Interactive TUI mode - pass the workbook so it can switch sheets
-        tui::run_tui(wb, &sheet_name, &config, cli.horizontal_scroll)?;
+        tui::run_tui(
+            wb,
+            &sheet_name,
+            &config,
+            cli.horizontal_scroll,
+            cli.theme.as_deref(),
+        )?;
     } else {
         // Load the sheet data for non-interactive modes
         let data = wb

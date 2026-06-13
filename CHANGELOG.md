@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom color themes via `[[theme.custom]]` in config.toml with hex and named color support
+- Theme inheritance (`inherits` field) for minimal theme definitions that extend built-in or custom themes
+- `foreground`/`background` aliases for broad-brush color setting, overridable by specific fields
+- `--theme <NAME>` CLI flag to select theme at launch (overrides config default)
+- Warn when terminal may not support truecolor and the active theme uses RGB colors
+
 ## [0.2.6] - 2026-05-24
 
 ### Added
