@@ -3,6 +3,10 @@
 **/*.rs.bk
 *.pdb
 
+# Python
+__pycache__
+
+
 # Test/generated files
 *.xlsx
 *.xls

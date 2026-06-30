@@ -2,9 +2,9 @@
 
 Excel terminal viewer written in Rust with TUI, search, formulas, and export capabilities.
 
-**Stack:** Rust 2024, calamine, clap, ratatui + crossterm, anyhow, comfy-table, arboard, chrono  
-**Formats:** `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`  
-**Key files:** `main.rs`, `workbook.rs`, `tui.rs`, `display.rs` in `src/`
+**Stack:** Rust 2024, calamine, clap, ratatui + crossterm, anyhow, comfy-table, arboard, chrono, csv (optional, `csv` feature)  
+**Formats:** `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`, `.csv`/`.tsv` (with `csv` feature)  
+**Key files:** `main.rs`, `workbook.rs`, `csv.rs`, `tui/` (modular), `display.rs`, `cli.rs`, `config.rs`, `utils.rs` in `src/`
 
 ## Commands
 
@@ -19,9 +19,13 @@ cargo install --path .                                      # install globally
 ## Architecture
 
 - `main.rs` — CLI parsing, orchestration
-- `workbook.rs` — Excel I/O, data extraction (calamine)
-- `tui.rs` — Interactive TUI state and rendering (ratatui)
-- `display.rs` — Non-interactive output (terminal, CSV, JSON, text) via comfy-table
+- `workbook.rs` — Excel/CSV I/O, data extraction; `Workbook` wraps a `Backend` enum (calamine `Sheets` or in-memory CSV)
+- `csv.rs` — CSV/TSV parsing into a single-sheet `SheetData`/`LazySheetData` (behind `csv` feature)
+- `tui/` — Interactive TUI: `theme.rs` (themes/colors), `state.rs` (app state), `rendering.rs` (draw), `event.rs` (event loop), `clipboard.rs` (OSC 52 + system clipboard)
+- `display/` — Non-interactive output: `sheet.rs` (SheetData table), `table.rs` (TableData table), `export.rs` (CSV/JSON/text) via comfy-table
+- `cli.rs` — CLI argument definitions (clap)
+- `config.rs` — Configuration file loading (TOML)
+- `utils.rs` — File type detection (magic bytes)
 
 ## Code Style
 
@@ -33,9 +37,9 @@ cargo install --path .                                      # install globally
 
 ## Common Patterns
 
-- **New CLI option:** field on `Cli` in `main.rs`, clap macros, handle in `main()`
-- **New export format:** `export_<format>()` in `display.rs`, match arm in `main()`
-- **Fix display:** `display_table()` in `display.rs`, test with DataTypes sheet
+- **New CLI option:** field on `Cli` in `cli.rs`, then handle it in `main()`
+- **New export format:** `export_<format>()` in `display/export.rs`, match arm in `main()`
+- **Fix display:** `display_table()` in `display/sheet.rs`, test with DataTypes sheet
 - **New cell type:** `CellValue` enum in `workbook.rs`, impl `Display`, update `datatype_to_cellvalue()`
 
 ## Development
