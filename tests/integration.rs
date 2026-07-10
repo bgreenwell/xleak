@@ -568,3 +568,47 @@ fn test_invalid_flag_combination() {
     // clap should reject this before main runs
     assert!(!output.status.success());
 }
+
+// =========================================================================
+// Export quoting/escaping (#52, #53)
+// =========================================================================
+
+#[test]
+fn test_export_csv_quotes_headers() {
+    // #52: headers containing the delimiter or quotes must be quoted.
+    let tmpdir = std::env::temp_dir();
+    let csv_path = tmpdir.join("xleak_test_hostile_headers.csv");
+    std::fs::write(&csv_path, "\"Name, Title\",\"Say \"\"hi\"\"\"\nAlice,x\n").unwrap();
+
+    let output = run_xleak(&[csv_path.to_str().unwrap(), "--export", "csv"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let header_line = stdout.lines().next().unwrap();
+    assert_eq!(header_line, "\"Name, Title\",\"Say \"\"hi\"\"\"");
+
+    let _ = std::fs::remove_file(&csv_path);
+}
+
+#[test]
+fn test_export_json_output_is_valid_json() {
+    // #53: quotes, backslashes, and newlines in cells/headers must be escaped.
+    let tmpdir = std::env::temp_dir();
+    let csv_path = tmpdir.join("xleak_test_json_escaping.csv");
+    std::fs::write(
+        &csv_path,
+        "\"He said \"\"hi\"\"\",back\\slash\n\"multi\nline\",plain\n",
+    )
+    .unwrap();
+
+    let output = run_xleak(&[csv_path.to_str().unwrap(), "--export", "json"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("export --json must produce valid JSON");
+    assert_eq!(parsed["headers"][0], "He said \"hi\"");
+    assert_eq!(parsed["headers"][1], "back\\slash");
+    assert_eq!(parsed["data"][0][0], "multi\nline");
+
+    let _ = std::fs::remove_file(&csv_path);
+}
