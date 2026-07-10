@@ -45,6 +45,16 @@ jobs:
       - name: Check build
         run: cargo build --release
 
+      - name: Set up Python (test fixtures)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Generate test fixtures
+        run: |
+          pip install openpyxl
+          python tests/fixtures/generate_all_tests.py
+
       - name: Run tests
         run: cargo test --verbose
 
