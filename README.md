@@ -23,13 +23,17 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 - **Smart data type handling** - numbers right-aligned, text left-aligned, booleans centered
 - **Multi-sheet support** - seamlessly navigate between sheets (Tab/Shift+Tab)
 - **Excel Table support** - list and extract named tables (.xlsx only)
-- **Multiple export formats** - CSV, JSON, plain text
+- **Multiple export formats** - CSV, JSON, plain text with customizable delimiters
+- **Color control** - `--color`/`--no-color` flags for piped or forced output
+- **No-header mode** - `--no-header` to treat first row as data
+- **Row/column IDs** - sticky column-letter row and row-number column in interactive mode (`--no-column-id`/`--no-row-id` to hide)
 - **Blazing fast** - powered by `calamine`, the fastest Excel parser in Rust
-- **Multiple file formats** - supports `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`
+- **Multiple file formats** - supports `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`, `.csv`, `.tsv`
+- **CSV/TSV support** - read and interactively view `.csv`/`.tsv` files (enabled by default; auto-detects delimiter, override with `--csv-delimiter`)
 
 ### Interactive TUI Features
 - **Full-text search** - search across all cells with `/`, navigate with `n`/`N`
-- **Clipboard support** - copy cells (`c`) or entire rows (`C`) to clipboard
+- **Clipboard support** - copy cells (`c`) or entire rows (`C`) to clipboard (OSC 52 + system clipboard, works over SSH)
 - **Formula display** - view Excel formulas in cell detail view (Enter key)
 - **Jump to row/column** - press `Ctrl+G` to jump to any cell (e.g., `A100`, `500`, `10,5`)
 - **Large file optimization** - lazy loading for files with 1000+ rows
@@ -147,8 +151,8 @@ xleak wide-data.xlsx -i -H
 - `/` - Search across all cells
 - `n` / `N` - Jump to next/previous search result
 - `Ctrl+G` - Jump to specific row/cell (e.g., `100`, `A50`, `10,5`)
-- `c` - Copy current cell to clipboard
-- `C` - Copy entire row to clipboard
+- `c` - Copy current cell to clipboard (OSC 52 + system clipboard, works over SSH)
+- `C` - Copy entire row to clipboard (tab-separated)
 - `Tab` / `Shift+Tab` - Switch between sheets
 - `?` - Show help
 - `q` - Quit
@@ -158,6 +162,16 @@ xleak wide-data.xlsx -i -H
 #### View a spreadsheet
 ```bash
 xleak quarterly-report.xlsx
+```
+
+#### View CSV/TSV files
+```bash
+# CSV and TSV files work just like spreadsheets
+xleak data.csv
+xleak data.tsv -i
+
+# Override the field delimiter (e.g. semicolon-separated)
+xleak data.csv --csv-delimiter ";"
 ```
 
 #### View a specific sheet
@@ -188,6 +202,29 @@ xleak data.xlsx --export json > output.json
 
 # Export as plain text (tab-separated)
 xleak data.xlsx --export text > output.txt
+
+# Custom delimiter for CSV/text export
+xleak data.xlsx --export csv --delimiter ";" > output.csv
+xleak data.xlsx --export text --delimiter "|" > output.txt
+```
+
+#### Control output formatting
+```bash
+# Disable colored output (useful for piping)
+xleak data.xlsx --no-color
+
+# Force colored output even when piped
+xleak data.xlsx --color | less -R
+
+# Treat first row as data (no headers)
+xleak data.xlsx --no-header
+
+# Generate column headers (A, B, C...) instead of using first row
+xleak data.xlsx --no-header -n 5
+
+# Hide the column-letter row or row-number column in interactive mode
+xleak data.xlsx -i --no-column-id
+xleak data.xlsx -i --no-row-id
 ```
 
 #### Work with Excel Tables (.xlsx only)
@@ -488,7 +525,7 @@ xleak is optimized for both small and large files:
 
 | Tool | Format | Speed | Terminal Native | Interactive | Search | Formulas |
 |------|--------|-------|----------------|-------------|--------|----------|
-| **xleak** | ✅ xlsx/xls/ods | ⚡ Fast | ✅ Yes | ✅ Full TUI | ✅ Yes | ✅ Yes |
+| **xleak** | ✅ xlsx/xls/ods/csv | ⚡ Fast | ✅ Yes | ✅ Full TUI | ✅ Yes | ✅ Yes |
 | Excel | ✅ xlsx | ❌ Slow startup | ❌ GUI only | ✅ Yes | ✅ Yes | ✅ Yes |
 | pandas | ✅ Many | ❌ Slow | ❌ Python required | ❌ No | ❌ No | ❌ No |
 | csvlook | ❌ CSV only | ✅ Fast | ✅ Yes | ❌ No | ❌ No | ❌ No |
@@ -502,9 +539,10 @@ Looking to view Word documents in the terminal? Check out **[doxx](https://githu
 - **Rust** - for performance and reliability
 - **calamine** - the fastest Excel/ODS parser
 - **ratatui** - terminal user interface framework
-- **prettytable-rs** - beautiful terminal tables
+- **comfy-table** - beautiful terminal tables for non-interactive output
 - **clap** - elegant CLI argument parsing
 - **arboard** - cross-platform clipboard support
+- **csv** - CSV/TSV parsing (optional `csv` feature)
 
 ## Troubleshooting
 
