@@ -34,3 +34,4 @@ CLAUDE.md
 .planning/
 scoop-bucket/
 .winget-manifest/
+.agents/
