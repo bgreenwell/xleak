@@ -51,6 +51,9 @@ jobs:
           python-version: "3.x"
 
       - name: Generate test fixtures
+        env:
+          # Windows Python defaults to cp1252 and chokes on the generator's ✓ output
+          PYTHONIOENCODING: utf-8
         run: |
           pip install openpyxl
           python tests/fixtures/generate_all_tests.py
