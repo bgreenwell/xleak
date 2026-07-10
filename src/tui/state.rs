@@ -64,16 +64,28 @@ impl SheetDataSource {
                 cache_size,
                 no_header,
             } => {
+                if start >= data.height {
+                    return (&[], &[]);
+                }
+                // Clamp to the rows that actually exist so a request past the
+                // sheet end can be satisfied by the cache without reloading.
+                let count = count.min(data.height - start);
+
+                // Reload when the request isn't fully covered by the cache
+                // (#51: returning only the cached remainder made search and
+                // tall viewports silently miss rows).
                 let needs_reload = match cache {
                     None => true,
-                    Some(c) => start < c.start_row || start >= c.start_row + c.rows.len(),
+                    Some(c) => start < c.start_row || start + count > c.start_row + c.rows.len(),
                 };
 
                 if needs_reload {
                     // Start the chunk a little before the request so backward
-                    // scrolling stays within the cache.
+                    // scrolling stays within the cache, and load at least
+                    // enough to cover the full request.
                     let cache_start = start.saturating_sub(*cache_size / 4);
-                    let (rows, formulas) = data.get_rows(cache_start, *cache_size, *no_header);
+                    let load = (*cache_size).max(start + count - cache_start);
+                    let (rows, formulas) = data.get_rows(cache_start, load, *no_header);
                     *cache = Some(RowCache {
                         start_row: cache_start,
                         rows,
@@ -777,5 +789,83 @@ impl TuiState {
             utils::column_index_to_letters(self.cursor_col),
             self.data_row_to_sheet_row(self.cursor_row)
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use calamine::{Data, Range};
+
+    /// Build a lazy source over `height` data rows (plus a header row), with a
+    /// deliberately small cache so requests can exceed it.
+    fn lazy_source(height: usize, cache_size: usize) -> SheetDataSource {
+        let mut range: Range<Data> = Range::new((0, 0), (height as u32, 0));
+        range.set_value((0, 0), Data::String("header".into()));
+        for r in 1..=height {
+            range.set_value((r as u32, 0), Data::Int(r as i64));
+        }
+        SheetDataSource::Lazy {
+            data: LazySheetData::from_range_with_formulas(range, None, false),
+            cache: None,
+            cache_size,
+            no_header: false,
+        }
+    }
+
+    #[test]
+    fn test_lazy_get_rows_returns_full_request_beyond_cache_size() {
+        // Regression for #51: a request larger than the cache came back
+        // truncated to the cache size, so search silently skipped rows.
+        let mut source = lazy_source(100, 10);
+        let (rows, formulas) = source.get_rows(0, 50);
+        assert_eq!(rows.len(), 50);
+        assert_eq!(formulas.len(), 50);
+        assert_eq!(rows[49][0].to_raw_string(), "50");
+    }
+
+    #[test]
+    fn test_lazy_get_rows_reloads_when_request_overruns_cache_tail() {
+        // A request starting inside the cache but extending past its end must
+        // reload rather than return the truncated remainder.
+        let mut source = lazy_source(100, 20);
+        source.get_rows(0, 20); // warm the cache with rows 0..20
+        let (rows, _) = source.get_rows(15, 20);
+        assert_eq!(rows.len(), 20);
+        assert_eq!(rows[0][0].to_raw_string(), "16");
+        assert_eq!(rows[19][0].to_raw_string(), "35");
+    }
+
+    #[test]
+    fn test_lazy_get_rows_clamps_at_sheet_end_without_thrashing() {
+        let mut source = lazy_source(30, 10);
+        let (rows, _) = source.get_rows(25, 50);
+        assert_eq!(rows.len(), 5);
+        assert_eq!(rows[4][0].to_raw_string(), "30");
+        // Entirely past the end: empty, no panic.
+        let (rows, _) = source.get_rows(30, 10);
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_search_style_chunked_scan_visits_every_row() {
+        // Mimics perform_search: fixed 500-row chunks over a lazy source whose
+        // cache is smaller than the chunk. Every row must be visited once.
+        let mut source = lazy_source(1200, 200);
+        let mut seen = Vec::new();
+        const CHUNK: usize = 500;
+        let total = source.height();
+        for chunk_start in (0..total).step_by(CHUNK) {
+            let chunk_size = CHUNK.min(total - chunk_start);
+            let (rows, _) = source.get_rows(chunk_start, chunk_size);
+            assert_eq!(rows.len(), chunk_size, "chunk at {chunk_start} truncated");
+            for (i, row) in rows.iter().enumerate() {
+                seen.push((chunk_start + i, row[0].to_raw_string()));
+            }
+        }
+        assert_eq!(seen.len(), 1200);
+        // Row i holds the value i+1; spot-check the previously skipped region.
+        assert_eq!(seen[250], (250, "251".to_string()));
+        assert_eq!(seen[1199], (1199, "1200".to_string()));
     }
 }
