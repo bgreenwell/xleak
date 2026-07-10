@@ -100,6 +100,40 @@ fn test_csv_file_displayed() {
 }
 
 #[test]
+fn test_extensionless_utf8_csv_displayed() {
+    let csv_path = std::env::temp_dir().join("xleak_test_utf8_no_extension");
+    std::fs::write(&csv_path, "\u{feff}City,Temperature\nMünchen,18\n").unwrap();
+
+    let result = run_xleak(&[csv_path.to_str().unwrap()]);
+    let _ = std::fs::remove_file(&csv_path);
+
+    assert!(
+        result.status.success(),
+        "Extensionless UTF-8 CSV failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(String::from_utf8_lossy(&result.stdout).contains("München"));
+}
+
+#[test]
+fn test_short_extensionless_csv_displayed() {
+    let csv_path = std::env::temp_dir().join("xleak_test_short_no_extension");
+    std::fs::write(&csv_path, "a,b\n1,2").unwrap();
+
+    let result = run_xleak(&[csv_path.to_str().unwrap()]);
+    let _ = std::fs::remove_file(&csv_path);
+
+    assert!(
+        result.status.success(),
+        "Short extensionless CSV failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("a"));
+    assert!(stdout.contains("2"));
+}
+
+#[test]
 fn test_csv_no_header_generates_columns() {
     let tmpdir = std::env::temp_dir();
     let csv_path = tmpdir.join("xleak_test_noheader.csv");
