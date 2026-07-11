@@ -612,3 +612,24 @@ fn test_export_json_output_is_valid_json() {
 
     let _ = std::fs::remove_file(&csv_path);
 }
+
+#[test]
+fn test_display_strips_terminal_escape_sequences() {
+    // #59: control chars in cells must not pass through to the terminal.
+    let tmpdir = std::env::temp_dir();
+    let csv_path = tmpdir.join("xleak_test_escapes.csv");
+    // Cell contains ESC ] 0 ; ... BEL (an OSC title-change sequence).
+    std::fs::write(&csv_path, "Name,Payload\nAlice,\x1b]0;pwned\x07value\n").unwrap();
+
+    let output = run_xleak(&[csv_path.to_str().unwrap(), "--no-color"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains('\x1b') && !stdout.contains('\x07'),
+        "table view must not emit raw ESC/BEL from cell contents"
+    );
+    // The printable remainder of the cell is still shown.
+    assert!(stdout.contains("value"));
+
+    let _ = std::fs::remove_file(&csv_path);
+}

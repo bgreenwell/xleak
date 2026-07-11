@@ -16,7 +16,11 @@ pub fn display_table_data(
     println!("║  xleak - Excel Table Viewer                     ║");
     println!("╚═════════════════════════════════════════════════╝");
     println!();
-    println!("Table: {} (from sheet: {})", table.name, table.sheet_name);
+    println!(
+        "Table: {} (from sheet: {})",
+        crate::utils::sanitize_terminal_text(&table.name),
+        crate::utils::sanitize_terminal_text(&table.sheet_name)
+    );
     println!(
         "{} rows × {} columns",
         table.rows.len(),
@@ -35,7 +39,8 @@ pub fn display_table_data(
 
     let mut header_row = Row::new();
     for h in &table.headers {
-        let mut cell = Cell::new(h).add_attribute(Attribute::Bold);
+        let mut cell =
+            Cell::new(crate::utils::sanitize_terminal_text(h)).add_attribute(Attribute::Bold);
         if use_color {
             cell = cell.fg(Color::Green);
         }
@@ -56,21 +61,21 @@ pub fn display_table_data(
     for row in table.rows.iter().take(rows_to_show) {
         let mut table_row = Row::new();
         for cell in row {
+            let text = cell.to_string();
+            let text = crate::utils::sanitize_terminal_text(&text);
             let cell_obj = match cell {
                 CellValue::Int(_) | CellValue::Float(_) => {
-                    Cell::new(cell.to_string()).set_alignment(CellAlignment::Right)
+                    Cell::new(text).set_alignment(CellAlignment::Right)
                 }
-                CellValue::Bool(_) => {
-                    Cell::new(cell.to_string()).set_alignment(CellAlignment::Center)
-                }
+                CellValue::Bool(_) => Cell::new(text).set_alignment(CellAlignment::Center),
                 CellValue::Error(_) => {
-                    let mut c = Cell::new(cell.to_string()).set_alignment(CellAlignment::Center);
+                    let mut c = Cell::new(text).set_alignment(CellAlignment::Center);
                     if use_color {
                         c = c.fg(Color::Red);
                     }
                     c
                 }
-                _ => Cell::new(cell.to_string()).set_alignment(CellAlignment::Left),
+                _ => Cell::new(text).set_alignment(CellAlignment::Left),
             };
             table_row.add_cell(cell_obj);
         }

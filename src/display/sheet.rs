@@ -10,7 +10,9 @@ use std::io::IsTerminal;
 
 /// Format a cell value with width limiting. With `wrap`, the full text is
 /// returned and comfy-table wraps it; otherwise long text is truncated with "...".
+/// Control characters are stripped so file content can't inject escapes (#59).
 pub(crate) fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
+    let value = &*crate::utils::sanitize_terminal_text(value);
     let char_count = value.chars().count();
     if char_count <= max_width {
         return value.to_string();
@@ -43,11 +45,17 @@ pub fn display_table(
     println!();
     println!(
         "Sheet: {} ({} rows × {} columns)",
-        sheet_name, data.height, data.width
+        crate::utils::sanitize_terminal_text(sheet_name),
+        data.height,
+        data.width
     );
 
     if all_sheets.len() > 1 {
-        println!("Available sheets: {}", all_sheets.join(", "));
+        let names: Vec<_> = all_sheets
+            .iter()
+            .map(|s| crate::utils::sanitize_terminal_text(s))
+            .collect();
+        println!("Available sheets: {}", names.join(", "));
     }
 
     if !show_formulas {
