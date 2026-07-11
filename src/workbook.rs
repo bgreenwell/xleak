@@ -387,19 +387,35 @@ impl CellValue {
             return (format!("Date[{}]", days), None);
         };
 
-        let frac = dt.fract();
-        if frac.abs() < 0.000001 {
-            (date.format("%Y-%m-%d").to_string(), None)
-        } else {
-            let total_seconds = (frac * 86400.0).round() as u32;
-            let hours = total_seconds / 3600;
-            let minutes = (total_seconds % 3600) / 60;
-            let seconds = total_seconds % 60;
-            (
-                date.format("%Y-%m-%d").to_string(),
-                Some(format!("{:02}:{:02}:{:02}", hours, minutes, seconds)),
-            )
+        // Relative to the floored day, so it's always in [0, 1) even for
+        // negative serials (f64::fract is negative there).
+        let frac = dt - days as f64;
+        if frac < 0.000001 {
+            return (date.format("%Y-%m-%d").to_string(), None);
         }
+
+        let total_seconds = (frac * 86400.0).round() as u32;
+        // Rounding a time just before midnight can hit exactly 86400 seconds;
+        // that's midnight of the next day, not 24:00:00 (#54).
+        let (date, total_seconds) = if total_seconds >= 86400 {
+            match date.checked_add_signed(Duration::days(1)) {
+                Some(d) => (d, 0),
+                None => return (format!("Date[{}]", days), None),
+            }
+        } else {
+            (date, total_seconds)
+        };
+        if total_seconds == 0 {
+            return (date.format("%Y-%m-%d").to_string(), None);
+        }
+
+        let hours = total_seconds / 3600;
+        let minutes = (total_seconds % 3600) / 60;
+        let seconds = total_seconds % 60;
+        (
+            date.format("%Y-%m-%d").to_string(),
+            Some(format!("{:02}:{:02}:{:02}", hours, minutes, seconds)),
+        )
     }
 
     /// Returns unformatted value (for export/clipboard)
@@ -811,6 +827,20 @@ mod tests {
         // Should contain both date and time
         assert!(display.contains(":"));
         assert!(display.len() > 10); // Date + time is longer than just date
+    }
+
+    #[test]
+    fn test_datetime_just_before_midnight_rolls_to_next_day() {
+        // Regression for #54: a fraction that rounds to 86400 seconds must
+        // render as midnight of the next day, never as 24:00:00.
+        // Day 1 = 1900-01-01; 0.9999999 * 86400 rounds to 86400.
+        let val = CellValue::DateTime(1.999_999_9);
+        assert_eq!(val.to_string(), "1900-01-02");
+        assert_eq!(val.to_raw_string(), "1900-01-02");
+
+        // A representable time just before midnight still renders normally.
+        let val = CellValue::DateTime(1.0 + 86399.0 / 86400.0);
+        assert_eq!(val.to_string(), "1900-01-01 23:59:59");
     }
 
     #[test]
