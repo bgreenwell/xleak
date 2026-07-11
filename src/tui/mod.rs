@@ -55,6 +55,29 @@ mod tests {
     }
 
     #[test]
+    fn test_horizontal_offset_jumps_directly() {
+        // 20 columns, each 10 wide (+1 separator), viewport 40 wide.
+        let widths = vec![10usize; 20];
+
+        // Cursor already visible: offset unchanged.
+        assert_eq!(TuiState::horizontal_offset_for(2, 0, &widths, 40), 0);
+        // Cursor left of the window: snap to it.
+        assert_eq!(TuiState::horizontal_offset_for(1, 5, &widths, 40), 1);
+        // #55: a far jump right lands in one step (columns 17..=19 fill the
+        // viewport: 3 × 11 = 33 ≤ 40), not one column per frame.
+        assert_eq!(TuiState::horizontal_offset_for(19, 0, &widths, 40), 17);
+    }
+
+    #[test]
+    fn test_horizontal_offset_overwide_column() {
+        // A column wider than the viewport becomes the only (partial) one.
+        let widths = vec![100usize; 5];
+        assert_eq!(TuiState::horizontal_offset_for(4, 0, &widths, 40), 4);
+        // Cursor past the last column: offset unchanged.
+        assert_eq!(TuiState::horizontal_offset_for(9, 3, &widths, 40), 3);
+    }
+
+    #[test]
     fn test_first_data_sheet_row() {
         // With a header row (default), the header is sheet row 1 and the first
         // data row is sheet row 2.

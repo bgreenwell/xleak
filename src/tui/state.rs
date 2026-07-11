@@ -651,25 +651,57 @@ impl TuiState {
         if !self.horizontal_scroll_enabled {
             return;
         }
+        self.horizontal_scroll_offset = Self::horizontal_offset_for(
+            self.cursor_col,
+            self.horizontal_scroll_offset,
+            &self.column_widths,
+            viewport_width,
+        );
+    }
 
+    /// Compute the scroll offset that keeps `cursor_col` visible. When the
+    /// cursor is right of the visible window, jump so it becomes the rightmost
+    /// column that fits (#55: advancing one column per frame made a far jump
+    /// crawl across the screen).
+    pub(crate) fn horizontal_offset_for(
+        cursor_col: usize,
+        current_offset: usize,
+        column_widths: &[usize],
+        viewport_width: usize,
+    ) -> usize {
+        if cursor_col < current_offset {
+            return cursor_col;
+        }
+        if cursor_col >= column_widths.len() {
+            return current_offset;
+        }
+
+        // Columns visible from the current offset (last one may be partial).
         let mut total_width = 0;
-        let mut visible_end = self.horizontal_scroll_offset;
-
-        for i in self.horizontal_scroll_offset..self.column_widths.len() {
-            total_width += self.column_widths[i] + 1;
+        let mut visible_end = current_offset;
+        for (i, w) in column_widths.iter().enumerate().skip(current_offset) {
+            total_width += w + 1;
             visible_end = i + 1;
             if total_width > viewport_width {
                 break;
             }
         }
-
-        if self.cursor_col >= visible_end {
-            self.horizontal_scroll_offset += 1;
+        if cursor_col < visible_end {
+            return current_offset;
         }
 
-        if self.cursor_col < self.horizontal_scroll_offset {
-            self.horizontal_scroll_offset = self.cursor_col;
+        // Walk left from the cursor column until the viewport is full.
+        let mut used = column_widths[cursor_col] + 1;
+        let mut offset = cursor_col;
+        while offset > 0 {
+            let w = column_widths[offset - 1] + 1;
+            if used + w > viewport_width {
+                break;
+            }
+            used += w;
+            offset -= 1;
         }
+        offset
     }
 
     pub fn move_left(&mut self) {
