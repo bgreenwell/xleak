@@ -59,6 +59,18 @@ pub fn detect_file_type<P: AsRef<Path>>(path: P) -> io::Result<FileType> {
     Ok(FileType::Unknown)
 }
 
+/// Strip control characters (Unicode `Cc`: C0, DEL, C1) except tab and
+/// newline, so untrusted spreadsheet content can't inject terminal escape
+/// sequences into non-interactive output (#59). Borrows when already clean.
+pub fn sanitize_terminal_text(s: &str) -> std::borrow::Cow<'_, str> {
+    let is_bad = |c: char| c.is_control() && c != '\t' && c != '\n';
+    if s.chars().any(is_bad) {
+        std::borrow::Cow::Owned(s.chars().filter(|&c| !is_bad(c)).collect())
+    } else {
+        std::borrow::Cow::Borrowed(s)
+    }
+}
+
 /// Convert a zero-based column index into spreadsheet-style letters
 /// (0 -> "A", 25 -> "Z", 26 -> "AA", ...).
 pub fn column_index_to_letters(col: usize) -> String {
@@ -75,6 +87,20 @@ pub fn column_index_to_letters(col: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sanitize_terminal_text() {
+        // Escape sequences are stripped, including C1 controls.
+        assert_eq!(sanitize_terminal_text("a\x1b[31mred"), "a[31mred");
+        assert_eq!(sanitize_terminal_text("bel\x07l"), "bell");
+        assert_eq!(sanitize_terminal_text("c1\u{9b}31mx"), "c131mx");
+        // Tab and newline survive; clean strings borrow unchanged.
+        assert_eq!(sanitize_terminal_text("a\tb\nc"), "a\tb\nc");
+        assert!(matches!(
+            sanitize_terminal_text("plain"),
+            std::borrow::Cow::Borrowed("plain")
+        ));
+    }
 
     #[test]
     fn test_column_index_to_letters() {
