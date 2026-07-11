@@ -633,3 +633,24 @@ fn test_display_strips_terminal_escape_sequences() {
 
     let _ = std::fs::remove_file(&csv_path);
 }
+
+#[test]
+fn test_extensionless_utf8_csv_detected() {
+    // #56: a UTF-8 CSV with a BOM and no file extension must be sniffed as CSV.
+    let tmpdir = std::env::temp_dir();
+    let path = tmpdir.join("xleak_test_bom_noext");
+    let mut content = vec![0xEF, 0xBB, 0xBF];
+    content.extend_from_slice("Náme,Age\nAlice,30\n".as_bytes());
+    std::fs::write(&path, content).unwrap();
+
+    let output = run_xleak(&[path.to_str().unwrap()]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Alice"));
+
+    let _ = std::fs::remove_file(&path);
+}
