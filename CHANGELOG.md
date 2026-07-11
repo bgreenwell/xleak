@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Formula display misaligned by one row with `--no-header` ([#50](https://github.com/bgreenwell/xleak/issues/50))
+- Datetimes just before midnight rendered as `24:00:00` instead of rolling to the next day ([#54](https://github.com/bgreenwell/xleak/issues/54))
 - Terminal left in raw mode when TUI setup failed or a panic unwound ([#58](https://github.com/bgreenwell/xleak/issues/58))
 - Control characters in cells could inject terminal escape sequences via the non-interactive table view ([#59](https://github.com/bgreenwell/xleak/issues/59))
 - CSV export did not quote the header row ([#52](https://github.com/bgreenwell/xleak/issues/52))
