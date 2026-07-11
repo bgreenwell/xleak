@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded dependencies: `calamine` 0.34→0.35, `ratatui` 0.29→0.30, `crossterm` 0.28→0.29, `toml` 0.8→1.1
 
 ### Fixed
+- Terminal left in raw mode when TUI setup failed or a panic unwound ([#58](https://github.com/bgreenwell/xleak/issues/58))
 - CSV export did not quote the header row ([#52](https://github.com/bgreenwell/xleak/issues/52))
 - JSON export produced invalid JSON for quotes, backslashes, newlines, and non-finite floats ([#53](https://github.com/bgreenwell/xleak/issues/53))
 - TUI search skipped most rows on lazy-loaded sheets (>1000 rows) ([#51](https://github.com/bgreenwell/xleak/issues/51))
