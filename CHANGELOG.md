@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Horizontal scroll now jumps directly after a far cursor jump instead of advancing one column per frame ([#55](https://github.com/bgreenwell/xleak/issues/55))
-- Extension-less UTF-8 CSVs (BOM or accented text) were rejected as unrecognized ([#56](https://github.com/bgreenwell/xleak/issues/56))
+- Extension-less UTF-8 CSVs (BOM or accented text) were rejected as unrecognized (thanks [@ychampion](https://github.com/ychampion) and [@nightcityblade](https://github.com/nightcityblade) for concurrent fixes in [#57](https://github.com/bgreenwell/xleak/pull/57)/[#60](https://github.com/bgreenwell/xleak/pull/60)! [#56](https://github.com/bgreenwell/xleak/issues/56))
 - Formula display misaligned by one row with `--no-header` ([#50](https://github.com/bgreenwell/xleak/issues/50))
 - Datetimes just before midnight rendered as `24:00:00` instead of rolling to the next day ([#54](https://github.com/bgreenwell/xleak/issues/54))
 - Sheets wider than 100 columns rendered every column at zero width in interactive mode without `-H`
