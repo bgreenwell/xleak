@@ -48,6 +48,13 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_cell_address_overflow_returns_none() {
+        // Enough letters to overflow the base-26 accumulator must be rejected,
+        // not wrap (release) or panic (debug).
+        assert_eq!(TuiState::parse_cell_address("AAAAAAAAAAAAAAAA1"), None);
+    }
+
+    #[test]
     fn test_first_data_sheet_row() {
         // With a header row (default), the header is sheet row 1 and the first
         // data row is sheet row 2.
