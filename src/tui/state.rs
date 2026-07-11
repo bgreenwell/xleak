@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::workbook::{CellValue, LazySheetData, SheetData, Workbook};
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use super::clipboard::{self, CopyOutcome};
@@ -129,43 +129,6 @@ impl SheetDataSource {
     }
 }
 
-/// Progress information for long-running operations
-#[derive(Debug, Clone)]
-pub(crate) struct ProgressInfo {
-    message: String,
-    current: usize,
-    total: usize,
-    started_at: Instant,
-}
-
-impl ProgressInfo {
-    pub fn new(message: impl Into<String>, total: usize) -> Self {
-        Self {
-            message: message.into(),
-            current: 0,
-            total,
-            started_at: Instant::now(),
-        }
-    }
-
-    pub fn update(&mut self, current: usize) {
-        self.current = current;
-    }
-
-    pub fn percentage(&self) -> usize {
-        (self.current * 100).checked_div(self.total).unwrap_or(100)
-    }
-
-    pub fn format(&self) -> String {
-        let pct = self.percentage();
-        let _elapsed = self.started_at.elapsed().as_secs_f64();
-        format!(
-            "{} {}% ({}/{})",
-            self.message, pct, self.current, self.total
-        )
-    }
-}
-
 /// TUI application state
 pub struct TuiState {
     pub workbook: Workbook,
@@ -186,15 +149,14 @@ pub struct TuiState {
     // Search state
     pub search_mode: bool,    // Whether we're in search input mode
     pub search_query: String, // Current search query
-    pub search_matches: Vec<(usize, usize)>, // List of (row, col) matches
+    pub search_matches: Vec<(usize, usize)>, // List of (row, col) matches in scan order
+    pub search_match_set: HashSet<(usize, usize)>, // Same matches, for O(1) render lookups
     pub current_match_index: Option<usize>, // Index in search_matches
     // Jump mode state
     pub jump_mode: bool,    // Whether we're in jump input mode
     pub jump_input: String, // Current jump input (row number or cell address)
     // Clipboard state
     pub copy_feedback: Option<(String, Instant)>, // Message and timestamp for copy feedback
-    // Progress state
-    pub progress: Option<ProgressInfo>, // Current operation progress
     // Theme state
     pub current_theme: Theme, // Current color theme
     // Config state
@@ -266,11 +228,11 @@ impl TuiState {
             search_mode: false,
             search_query: String::new(),
             search_matches: Vec::new(),
+            search_match_set: HashSet::new(),
             current_match_index: None,
             jump_mode: false,
             jump_input: String::new(),
             copy_feedback: None,
-            progress: None,
             current_theme: Self::parse_theme_name(&config.theme.default),
             config: config.clone(),
             no_header,
@@ -399,19 +361,15 @@ impl TuiState {
     /// Perform case-insensitive search across all cells
     pub fn perform_search(&mut self) {
         self.search_matches.clear();
+        self.search_match_set.clear();
         self.current_match_index = None;
 
         if self.search_query.is_empty() {
-            self.progress = None;
             return;
         }
 
         let query_lower = self.search_query.to_lowercase();
         let total_height = self.sheet_data.height();
-
-        if total_height > 1000 {
-            self.progress = Some(ProgressInfo::new("Searching", total_height));
-        }
 
         const SEARCH_CHUNK_SIZE: usize = 500;
         for chunk_start in (0..total_height).step_by(SEARCH_CHUNK_SIZE) {
@@ -424,16 +382,11 @@ impl TuiState {
                     let cell_str = cell.to_string().to_lowercase();
                     if cell_str.contains(&query_lower) {
                         self.search_matches.push((row_idx, col_idx));
+                        self.search_match_set.insert((row_idx, col_idx));
                     }
                 }
             }
-
-            if let Some(ref mut progress) = self.progress {
-                progress.update(chunk_start + chunk_size);
-            }
         }
-
-        self.progress = None;
 
         if !self.search_matches.is_empty() {
             self.current_match_index = Some(0);
@@ -485,6 +438,7 @@ impl TuiState {
     pub fn clear_search(&mut self) {
         self.search_query.clear();
         self.search_matches.clear();
+        self.search_match_set.clear();
         self.current_match_index = None;
     }
 
@@ -583,7 +537,10 @@ impl TuiState {
 
         for ch in addr.chars() {
             if ch.is_ascii_alphabetic() {
-                col = col * 26 + (ch as usize - 'A' as usize + 1);
+                // Checked: enough letters (14+) would overflow usize.
+                col = col
+                    .checked_mul(26)?
+                    .checked_add(ch as usize - 'A' as usize + 1)?;
             } else if ch.is_ascii_digit() {
                 row_str.push(ch);
             } else {
@@ -673,7 +630,7 @@ impl TuiState {
 
         let headers = self.sheet_data.headers();
         for (i, header) in headers.iter().enumerate() {
-            widths[i] = header.len();
+            widths[i] = header.chars().count();
         }
 
         let sample_size = 100.min(self.sheet_data.height());
@@ -681,7 +638,8 @@ impl TuiState {
 
         for row in sample_rows.iter() {
             for (col_idx, cell) in row.iter().enumerate() {
-                let len = cell.to_string().len();
+                // Chars, not bytes: byte length over-sizes multibyte UTF-8.
+                let len = cell.to_string().chars().count();
                 widths[col_idx] = widths[col_idx].max(len);
             }
         }

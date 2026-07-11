@@ -203,7 +203,8 @@ impl TuiState {
                                 style = style.bg(alt_bg);
                             }
 
-                            let is_search_match = self.search_matches.contains(&(row_idx, col_idx));
+                            let is_search_match =
+                                self.search_match_set.contains(&(row_idx, col_idx));
                             let is_current_match = self
                                 .current_match_index
                                 .and_then(|idx| self.search_matches.get(idx))
@@ -248,10 +249,12 @@ impl TuiState {
             );
         } else {
             let sheet_width = self.sheet_data.width();
+            // Ratio, not Percentage: 100/width truncates to 0% past 100
+            // columns, collapsing every column to zero width.
             col_widths.extend(
                 headers
                     .iter()
-                    .map(|_| Constraint::Percentage((100 / sheet_width.max(1)) as u16)),
+                    .map(|_| Constraint::Ratio(1, sheet_width.max(1) as u32)),
             );
         }
 
@@ -343,9 +346,7 @@ impl TuiState {
         // searching); right segment shows the theme and key hints.
         let cell_addr = self.current_cell_address();
 
-        let (info_left, info_right) = if let Some(ref progress) = self.progress {
-            (format!(" ⏳ {} ", progress.format()), String::new())
-        } else if self.jump_mode {
+        let (info_left, info_right) = if self.jump_mode {
             (format!(" Jump: {} ", self.jump_input), String::new())
         } else if self.search_mode {
             (
