@@ -37,6 +37,7 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 - **Formula display** - view Excel formulas in cell detail view (Enter key)
 - **Jump to row/column** - press `Ctrl+G` to jump to any cell (e.g., `A100`, `500`, `10,5`)
 - **Large file optimization** - lazy loading for files with 1000+ rows
+- **Vertical scrollbar** - shows the current position when table rows exceed the viewport
 - **Progress indicators** - real-time feedback for long operations
 - **Visual cell highlighting** - current row, column, and cell clearly marked
 
