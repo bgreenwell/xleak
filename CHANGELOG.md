@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded dependencies: `calamine` 0.34→0.35, `ratatui` 0.29→0.30, `crossterm` 0.28→0.29, `toml` 0.8→1.1
 
 ### Fixed
+- Formula display misaligned by one row with `--no-header` ([#50](https://github.com/bgreenwell/xleak/issues/50))
 - Terminal left in raw mode when TUI setup failed or a panic unwound ([#58](https://github.com/bgreenwell/xleak/issues/58))
 - Control characters in cells could inject terminal escape sequences via the non-interactive table view ([#59](https://github.com/bgreenwell/xleak/issues/59))
 - CSV export did not quote the header row ([#52](https://github.com/bgreenwell/xleak/issues/52))

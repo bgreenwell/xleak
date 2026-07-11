@@ -256,7 +256,7 @@ impl LazySheetData {
                     .map(|row| row.iter().map(SheetData::datatype_to_cellvalue).collect())
                     .collect();
 
-                let formulas = self.get_formulas_for_range(start, end);
+                let formulas = self.get_formulas_for_range(start, end, no_header);
                 (rows, formulas)
             }
             #[cfg(feature = "csv")]
@@ -268,16 +268,21 @@ impl LazySheetData {
         }
     }
 
-    fn get_formulas_for_range(&self, start: usize, end: usize) -> Vec<Vec<Option<String>>> {
+    fn get_formulas_for_range(
+        &self,
+        start: usize,
+        end: usize,
+        no_header: bool,
+    ) -> Vec<Vec<Option<String>>> {
         match &self.source {
             LazySource::Excel { formula_range, .. } => {
                 if let Some(formula_range) = formula_range {
                     SheetData::build_formula_grid(
                         formula_range,
                         self.width,
-                        self.height,
                         start,
                         end - start,
+                        no_header,
                     )
                 } else {
                     vec![vec![None; self.width]; end - start]
@@ -521,35 +526,42 @@ impl std::fmt::Display for CellValue {
 }
 
 impl SheetData {
-    /// Build a formula grid from a formula range, mapping formulas to their absolute
-    /// cell positions. Returns a 2D grid of Optional formula strings.
+    /// Build a formula grid for data rows `start_row..start_row + num_rows`,
+    /// mapping formulas from their absolute sheet positions.
     fn build_formula_grid(
         formula_range: &Range<String>,
         width: usize,
-        height: usize,
         start_row: usize,
         num_rows: usize,
+        no_header: bool,
     ) -> Vec<Vec<Option<String>>> {
         let formula_start = formula_range.start().unwrap_or((0, 0));
-        let total_height = height + 1; // Include header row
 
         let mut formula_grid: Vec<Vec<Option<String>>> = vec![vec![None; width]; num_rows];
 
         for (row_offset, formula_row) in formula_range.rows().enumerate() {
             let absolute_row = formula_start.0 as usize + row_offset;
 
-            if absolute_row > 0 && absolute_row <= total_height {
-                let data_row_idx = absolute_row - 1; // Convert to 0-based data row index
+            // Sheet row -> data row: with a header, data row i is sheet row
+            // i + 1 (the header row has no data row); without one they
+            // coincide (#50: the -1 shift used to apply unconditionally).
+            let data_row_idx = if no_header {
+                absolute_row
+            } else {
+                match absolute_row.checked_sub(1) {
+                    Some(idx) => idx,
+                    None => continue, // formula on the header row
+                }
+            };
 
-                // Only process if this row is in our requested range
-                if data_row_idx >= start_row && data_row_idx < start_row + num_rows {
-                    let result_idx = data_row_idx - start_row;
+            // Only process if this row is in our requested range
+            if data_row_idx >= start_row && data_row_idx < start_row + num_rows {
+                let result_idx = data_row_idx - start_row;
 
-                    for (col_offset, formula_str) in formula_row.iter().enumerate() {
-                        let absolute_col = formula_start.1 as usize + col_offset;
-                        if absolute_col < width && !formula_str.is_empty() {
-                            formula_grid[result_idx][absolute_col] = Some(formula_str.clone());
-                        }
+                for (col_offset, formula_str) in formula_row.iter().enumerate() {
+                    let absolute_col = formula_start.1 as usize + col_offset;
+                    if absolute_col < width && !formula_str.is_empty() {
+                        formula_grid[result_idx][absolute_col] = Some(formula_str.clone());
                     }
                 }
             }
@@ -595,7 +607,7 @@ impl SheetData {
         };
 
         let formulas: Vec<Vec<Option<String>>> = if let Some(ref formula_range) = formula_range {
-            Self::build_formula_grid(formula_range, width, height, 0, row_count)
+            Self::build_formula_grid(formula_range, width, 0, row_count, no_header)
         } else {
             vec![vec![None; width]; row_count]
         };
@@ -854,5 +866,52 @@ mod tests {
         assert_eq!(sheet.height, 2);
         assert_eq!(sheet.rows.len(), 2);
         assert_eq!(sheet.formulas.len(), 2);
+    }
+
+    /// 3-row sheet with a formula on sheet rows 0 and 2 (0-indexed).
+    fn range_with_formulas() -> (Range<Data>, Range<String>) {
+        let mut range: Range<Data> = Range::new((0, 0), (2, 0));
+        range.set_value((0, 0), Data::String("head".into()));
+        range.set_value((1, 0), Data::Int(10));
+        range.set_value((2, 0), Data::Int(20));
+
+        let mut formulas: Range<String> = Range::new((0, 0), (2, 0));
+        formulas.set_value((0, 0), "=ROW0".to_string());
+        formulas.set_value((2, 0), "=ROW2".to_string());
+        (range, formulas)
+    }
+
+    #[test]
+    fn test_formula_alignment_with_no_header() {
+        // Regression for #50: without a header, data row i IS sheet row i, but
+        // the grid builder applied the header -1 shift unconditionally, showing
+        // every formula one row off and dropping the one on sheet row 0.
+        let (range, formulas) = range_with_formulas();
+        let sheet = SheetData::from_range_with_formulas(range, Some(formulas), true);
+        assert_eq!(sheet.formulas[0][0].as_deref(), Some("=ROW0"));
+        assert_eq!(sheet.formulas[1][0], None);
+        assert_eq!(sheet.formulas[2][0].as_deref(), Some("=ROW2"));
+    }
+
+    #[test]
+    fn test_formula_alignment_with_header() {
+        // With a header, data row i is sheet row i + 1; the formula on the
+        // header row itself is not part of the data grid.
+        let (range, formulas) = range_with_formulas();
+        let sheet = SheetData::from_range_with_formulas(range, Some(formulas), false);
+        assert_eq!(sheet.formulas[0][0], None); // sheet row 1 has no formula
+        assert_eq!(sheet.formulas[1][0].as_deref(), Some("=ROW2"));
+    }
+
+    #[test]
+    fn test_formula_alignment_lazy_no_header() {
+        // Same regression via the lazy path used by the TUI.
+        let (range, formulas) = range_with_formulas();
+        let lazy = LazySheetData::from_range_with_formulas(range, Some(formulas), true);
+        let (rows, grid) = lazy.get_rows(0, 3, true);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(grid[0][0].as_deref(), Some("=ROW0"));
+        assert_eq!(grid[1][0], None);
+        assert_eq!(grid[2][0].as_deref(), Some("=ROW2"));
     }
 }
