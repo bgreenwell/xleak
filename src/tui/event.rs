@@ -201,6 +201,22 @@ impl TuiState {
     }
 }
 
+/// Undo raw mode and the alternate screen. Safe to call more than once.
+fn restore_terminal() {
+    let _ = disable_raw_mode();
+    let _ = execute!(io::stdout(), LeaveAlternateScreen, crossterm::cursor::Show);
+}
+
+/// RAII guard that restores the terminal when dropped, so early `?` returns
+/// and panic unwinds can't leave the user's shell in raw mode (#58).
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        restore_terminal();
+    }
+}
+
 /// Run the TUI application
 pub fn run_tui(
     workbook: Workbook,
@@ -220,8 +236,18 @@ pub fn run_tui(
         );
     }
 
-    // Setup terminal
+    // Restore the terminal before the panic message prints, so it lands on a
+    // readable screen instead of vanishing into the alternate buffer.
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        restore_terminal();
+        original_hook(info);
+    }));
+
+    // Setup terminal. The guard covers every exit from here on: normal
+    // return, `?` on a failed sheet load, or a panic unwind.
     enable_raw_mode().context("Failed to enable terminal raw mode. Is this a proper TTY?")?;
+    let _guard = TerminalGuard;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("Failed to enter alternate screen mode")?;
     let backend = CrosstermBackend::new(stdout);
@@ -239,14 +265,7 @@ pub fn run_tui(
     )?;
 
     // Main event loop
-    let res = run_event_loop(&mut terminal, &mut app);
-
-    // Cleanup terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    res
+    run_event_loop(&mut terminal, &mut app)
 }
 
 fn run_event_loop(
