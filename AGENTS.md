@@ -44,7 +44,11 @@ cargo install --path .                                      # install globally
 
 ## Development
 
-Feature branches → PR to `main`. Direct commits: releases, hotfixes, minor docs only.
+`devel` is the default and integration branch; `main` tracks releases.
+Never commit directly to either — branch off `devel` (`feature/...`,
+`fix/...`, `chore/...`), open a PR to `devel`, and merge after CI is green.
+Releases merge `devel` into `main` and tag `vX.Y.Z` there (see
+`RELEASE_CHECKLIST.md`).
 
 **PR checklist:**
 - [ ] Tested with fixtures (multiple formats: .xlsx, .xls, .ods)
