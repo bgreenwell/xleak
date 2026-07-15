@@ -1,5 +1,7 @@
 # xleak
 
+@../CLAUDE.md
+
 Excel terminal viewer written in Rust with TUI, search, formulas, and export capabilities.
 
 **Stack:** Rust 2024, calamine, clap, ratatui + crossterm, anyhow, comfy-table, arboard, chrono, csv (optional, `csv` feature)  
@@ -29,8 +31,6 @@ cargo install --path .                                      # install globally
 
 ## Code Style
 
-- Fix all `cargo clippy` warnings; run `cargo fmt` before committing
-- Error handling: `anyhow::Result<T>` with `.context()` for messages
 - Comments: only when "why" is non-obvious; doc comments for public APIs
 - `CellValue` enum: exhaustive pattern matching required
 - Use `--release` for performance testing; use `-n` to limit rows on large files
@@ -44,16 +44,12 @@ cargo install --path .                                      # install globally
 
 ## Development
 
-Conventional commits: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.  
 Feature branches → PR to `main`. Direct commits: releases, hotfixes, minor docs only.
 
 **PR checklist:**
-- [ ] Compiles, no clippy warnings, `cargo fmt` clean
 - [ ] Tested with fixtures (multiple formats: .xlsx, .xls, .ods)
 - [ ] README.md updated (user-facing) or AGENTS.md (architecture changes)
 - [ ] Concise entry added to CHANGELOG.md under `[Unreleased]`
-
-**Changelog style:** One line per item, no filler words. Bad: `"Formula cells are now detected and a warning is shown to inform users that..."`. Good: `"Warn when formula cells are blank due to uncached xlsx values"`.
 
 ## Release
 
