@@ -1,8 +1,8 @@
-# GitHub Dependabot configuration for doxx - DISABLED
+# GitHub Dependabot configuration for xleak
 # See: https://docs.github.com/en/code-security/dependabot
-# 
-# This is disabled during early development to avoid PR spam.
-# Rename to dependabot.yml when project is stable and ready for automated dependency updates.
+#
+# Re-enabled 2026-07-15 - the project has multiple tagged releases now,
+# so automated dependency PRs are worth the noise.
 
 version: 2
 updates:
@@ -25,7 +25,10 @@ updates:
     labels:
       - "dependencies"
       - "rust"
-    # Group ALL updates to reduce PR noise
+    # Group minor/patch updates to reduce PR noise. Majors are deliberately
+    # NOT grouped: bundling a breaking change in with 19 safe ones means one
+    # bad major blocks the whole group instead of just itself. Ungrouped
+    # majors fall through to their own individual PRs instead.
     groups:
       rust-dependencies:
         patterns:
@@ -33,8 +36,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-          - "major"
-    
+
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
