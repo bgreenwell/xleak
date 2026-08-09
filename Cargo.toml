@@ -2,6 +2,7 @@
 name = "xleak"
 version = "0.2.6"
 edition = "2024"
+rust-version = "1.88"
 authors = ["Brandon Greenwell <greenwell.brandon@gmail.com>"]
 description = "A fast terminal Excel viewer with interactive TUI, search, formulas, and export capabilities"
 license = "MIT"
