@@ -46,7 +46,7 @@ jobs:
         run: cargo build --release
 
       - name: Set up Python (test fixtures)
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.x"
 
