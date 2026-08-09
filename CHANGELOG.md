@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Info bar left side shows the cell address (plus the live search query while searching); theme and key hints are right-aligned
 - Status bar shows the current cell value, wrapping onto extra lines (up to 3/4 of the terminal height) when too long
 - Upgraded dependencies: `calamine` 0.34→0.35, `ratatui` 0.29→0.30, `crossterm` 0.28→0.29, `toml` 0.8→1.1
+- Declared a minimum supported Rust version of 1.88, matching what the dependency tree already required ([#72](https://github.com/bgreenwell/xleak/issues/72))
 
 ### Fixed
 - Horizontal scroll now jumps directly after a far cursor jump instead of advancing one column per frame ([#55](https://github.com/bgreenwell/xleak/issues/55))
