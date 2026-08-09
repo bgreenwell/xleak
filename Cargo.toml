@@ -29,7 +29,7 @@ chrono = "0.4"
 
 # Clipboard support
 arboard = "3.4"
-base64 = "0.22"
+base64 = "0.23"
 
 # Configuration file support
 serde = { version = "1.0", features = ["derive"] }
