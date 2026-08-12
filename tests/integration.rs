@@ -654,3 +654,69 @@ fn test_extensionless_utf8_csv_detected() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+// =========================================================================
+// --theme flag
+// =========================================================================
+
+#[test]
+fn test_theme_unknown_name_exits_nonzero() {
+    let fixture = format!("{FIXTURE_DIR}/test_comprehensive.xlsx");
+    let output = run_xleak(&[&fixture, "--theme", "nope"]);
+    assert!(!output.status.success(), "should fail for unknown theme");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Unknown theme"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("Default"),
+        "should list available: {stderr}"
+    );
+}
+
+#[test]
+fn test_theme_valid_with_export_succeeds() {
+    let fixture = format!("{FIXTURE_DIR}/test_comprehensive.xlsx");
+    let output = run_xleak(&[&fixture, "--theme", "Nord", "--export", "csv"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn test_export_mode_suppresses_truecolor_warning() {
+    let tmpdir = std::env::temp_dir();
+    let csv_path = tmpdir.join("xleak_truecolor_gate.csv");
+    std::fs::write(&csv_path, "Name,Age\nAlice,30\n").unwrap();
+    let config_path = tmpdir.join("xleak_truecolor_gate_config.toml");
+    std::fs::write(
+        &config_path,
+        "[theme]\ndefault = \"rgbtest\"\n\n[[theme.custom]]\nname = \"rgbtest\"\ninherits = \"Nord\"\nstring_fg = \"#010203\"\n",
+    )
+    .unwrap();
+
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_xleak"));
+    cmd.args([
+        csv_path.to_str().unwrap(),
+        "--export",
+        "csv",
+        "--config",
+        config_path.to_str().unwrap(),
+    ]);
+    cmd.env_remove("COLORTERM");
+    let output = cmd.output().expect("Failed to execute xleak");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("uses RGB colors"),
+        "truecolor warning should not fire in non-interactive export mode, got:\n{stderr}"
+    );
+
+    let _ = std::fs::remove_file(&csv_path);
+    let _ = std::fs::remove_file(&config_path);
+}

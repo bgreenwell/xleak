@@ -167,18 +167,30 @@ fn main() -> Result<()> {
         sheet_names[0].clone()
     };
 
+    let tui_options = tui::TuiOptions {
+        horizontal_scroll: cli.horizontal_scroll,
+        no_header: cli.no_header,
+        no_column_id: cli.no_column_id,
+        no_row_id: cli.no_row_id,
+        theme: cli.theme.clone(),
+    };
+
+    // Resolve themes before entering the TUI or exporting, so `--theme` and
+    // bad `inherits` errors surface identically in both modes.
+    let (themes, warnings) =
+        tui::resolve_themes_from_config(&config.theme, tui_options.theme.as_deref())?;
+    for warning in &warnings {
+        eprintln!("Warning: {warning}");
+    }
     // Display, export, or run TUI
     if cli.interactive {
+        // Warn only in interactive mode; non-interactive output never uses theme colors
+        if let Some(w) = tui::truecolor_warning(&themes, std::env::var("COLORTERM").ok().as_deref())
+        {
+            eprintln!("Warning: {w}");
+        }
         // Interactive TUI mode - pass the workbook so it can switch sheets
-        tui::run_tui(
-            wb,
-            &sheet_name,
-            &config,
-            cli.horizontal_scroll,
-            cli.no_header,
-            cli.no_column_id,
-            cli.no_row_id,
-        )?;
+        tui::run_tui(wb, &sheet_name, &config, themes, &tui_options)?;
     } else {
         // Load the sheet data for non-interactive modes
         let data = wb

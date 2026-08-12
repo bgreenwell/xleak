@@ -65,6 +65,10 @@ pub struct Cli {
     #[arg(long)]
     pub no_row_id: bool,
 
+    /// Color theme to use (e.g. Dracula, Nord, "Solarized Dark")
+    #[arg(long, value_name = "NAME")]
+    pub theme: Option<String>,
+
     /// Disable colored output (useful for piping)
     #[arg(long)]
     pub no_color: bool,

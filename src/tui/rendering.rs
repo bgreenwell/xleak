@@ -24,8 +24,9 @@ impl TuiState {
             format!("{current_cell_value} ")
         };
 
-        let mut status_style = Style::default().fg(self.current_theme.colors().status_bar_fg);
-        if let Some(bg) = self.current_theme.colors().status_bar_bg {
+        let colors = self.themes.current();
+        let mut status_style = Style::default().fg(colors.status_bar_fg);
+        if let Some(bg) = colors.status_bar_bg {
             status_style = status_style.bg(bg);
         }
 
@@ -95,7 +96,7 @@ impl TuiState {
 
         // Cloned to avoid borrowing self while building rows.
         let headers = self.sheet_data.headers().to_vec();
-        let colors = self.current_theme.colors();
+        let colors = self.themes.current().clone();
 
         let mut header_cells: Vec<Cell> = Vec::new();
 
@@ -353,7 +354,7 @@ impl TuiState {
                 format!(" {} | {} ", cell_addr, self.search_query),
                 format!(
                     "{} | t:theme /:search ?:help q:quit ",
-                    self.current_theme.name()
+                    self.themes.current_name()
                 ),
             )
         } else if let Some(idx) = self.current_match_index {
@@ -362,7 +363,7 @@ impl TuiState {
                 format!(" {} | {} ", match_info, cell_addr),
                 format!(
                     "{} | n:next N:prev Esc:clear ?:help q:quit ",
-                    self.current_theme.name()
+                    self.themes.current_name()
                 ),
             )
         } else {
@@ -370,7 +371,7 @@ impl TuiState {
                 format!(" {} ", cell_addr),
                 format!(
                     "{} | t:theme /:search ?:help q:quit ",
-                    self.current_theme.name()
+                    self.themes.current_name()
                 ),
             )
         };
@@ -679,7 +680,7 @@ impl TuiState {
             Line::from("  Cell colors vary by type and current theme:"),
             Line::from("  • Numbers, strings, dates, booleans, errors each have distinct colors"),
             Line::from("  • Alternating row backgrounds improve readability"),
-            Line::from("  • Press 't' to cycle through 6 built-in themes"),
+            Line::from("  • Press 't' to cycle through available themes"),
             Line::from(""),
             Line::from(Span::styled(
                 "STATUS BAR INFO",

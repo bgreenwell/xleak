@@ -325,7 +325,7 @@ xleak --config /path/to/config.toml file.xlsx -i
 default = "Dracula"
 ```
 
-**Available themes:**
+**Built-in themes:**
 - `"Default"` - Clean light theme with subtle colors
 - `"Dracula"` - Popular dark theme with purple accents
 - `"Solarized Dark"` - Precision colors for machines and people
@@ -334,6 +334,28 @@ default = "Dracula"
 - `"Nord"` - Arctic, north-bluish color palette
 
 Press `t` in interactive mode to cycle through themes at runtime.
+Use `--theme <NAME>` to select a theme from the command line.
+
+#### Custom Themes
+
+Define custom themes in `[[theme.custom]]` blocks. Colors can be `#RRGGBB` hex
+or named colors (`red`, `cyan`, `light-yellow`, etc.).
+
+```toml
+[[theme.custom]]
+name = "tokyonight"
+inherits = "Dracula"
+foreground = "#c0caf5"
+background = "#1a1b26"
+header_fg = "#7aa2f7"
+border_fg = "#565f89"
+```
+
+- `inherits` copies another theme's palette before applying your overrides. Without it, a custom theme sharing a built-in's name inherits that built-in; a new name inherits Default.
+- `foreground` / `background` are broad-brush aliases — specific fields like `string_fg` override them.
+- Aliases exclude cursor, search, and row-highlight colors so they keep contrast from the parent theme.
+- Custom themes appear after built-ins in the `t` cycle.
+- `deny_unknown_fields` is on: a typo like `forground` will error rather than be silently ignored.
 
 #### UI Settings
 
@@ -481,6 +503,20 @@ jump = "Ctrl+j"
 ```toml
 [theme]
 default = "Nord"
+```
+
+**Custom theme:**
+```toml
+[theme]
+default = "tokyonight"
+
+[[theme.custom]]
+name = "tokyonight"
+inherits = "Dracula"
+foreground = "#c0caf5"
+background = "#1a1b26"
+header_fg = "#7aa2f7"
+border_fg = "#565f89"
 ```
 
 **VIM user:**
