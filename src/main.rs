@@ -182,12 +182,13 @@ fn main() -> Result<()> {
     for warning in &warnings {
         eprintln!("Warning: {warning}");
     }
-    if let Some(w) = tui::truecolor_warning(&themes, std::env::var("COLORTERM").ok().as_deref()) {
-        eprintln!("Warning: {w}");
-    }
-
     // Display, export, or run TUI
     if cli.interactive {
+        // Warn only in interactive mode; non-interactive output never uses theme colors
+        if let Some(w) = tui::truecolor_warning(&themes, std::env::var("COLORTERM").ok().as_deref())
+        {
+            eprintln!("Warning: {w}");
+        }
         // Interactive TUI mode - pass the workbook so it can switch sheets
         tui::run_tui(wb, &sheet_name, &config, themes, &tui_options)?;
     } else {
