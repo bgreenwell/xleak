@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Vertical scrollbar for tables taller than the interactive viewport ([#38](https://github.com/bgreenwell/xleak/issues/38))
 - OSC 52 clipboard support: `c`/`C` now copy via OSC 52 (works over SSH) in addition to the system clipboard
 - CSV/TSV support: read and interactively view `.csv`/`.tsv` files as a single sheet (behind the default-on `csv` feature)
 - `--csv-delimiter` option to override the inferred CSV/TSV field delimiter

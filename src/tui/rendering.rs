@@ -4,11 +4,26 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
+    widgets::{
+        Block, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, Wrap,
+    },
 };
 use std::time::Duration;
 
 use super::state::TuiState;
+
+fn table_scrollbar_state(
+    content_length: usize,
+    viewport_height: usize,
+    scroll_offset: usize,
+) -> Option<ScrollbarState> {
+    (viewport_height > 0 && content_length > viewport_height).then(|| {
+        ScrollbarState::new(content_length)
+            .position(scroll_offset)
+            .viewport_content_length(viewport_height)
+    })
+}
 
 impl TuiState {
     pub fn render(&mut self, frame: &mut Frame) {
@@ -341,6 +356,29 @@ impl TuiState {
         }
 
         frame.render_widget(table, chunks[0]);
+
+        if let Some(mut scrollbar_state) =
+            table_scrollbar_state(self.sheet_data.height(), table_height, self.scroll_offset)
+        {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .track_symbol(Some("│"))
+                .thumb_symbol("█")
+                .track_style(Style::default().fg(colors.border_fg))
+                .thumb_style(Style::default().fg(colors.current_col_fg));
+            let scrollbar_area = Rect::new(
+                chunks[0].right().saturating_sub(1),
+                chunks[0]
+                    .y
+                    .saturating_add(1)
+                    .saturating_add(header_row_count),
+                1,
+                table_height as u16,
+            );
+
+            frame.render_stateful_widget(scrollbar, scrollbar_area, &mut scrollbar_state);
+        }
 
         // Info bar: left segment shows the cell address (and live search query while
         // searching); right segment shows the theme and key hints.
@@ -1073,5 +1111,31 @@ impl TuiState {
         .alignment(Alignment::Center);
 
         frame.render_widget(feedback_paragraph, popup_area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::widgets::ScrollbarState;
+
+    use super::table_scrollbar_state;
+
+    #[test]
+    fn table_scrollbar_is_hidden_when_all_rows_fit() {
+        assert_eq!(table_scrollbar_state(8, 8, 0), None);
+        assert_eq!(table_scrollbar_state(5, 8, 0), None);
+        assert_eq!(table_scrollbar_state(5, 0, 0), None);
+    }
+
+    #[test]
+    fn table_scrollbar_tracks_the_visible_rows_and_offset() {
+        assert_eq!(
+            table_scrollbar_state(20, 8, 7),
+            Some(
+                ScrollbarState::new(20)
+                    .position(7)
+                    .viewport_content_length(8)
+            )
+        );
     }
 }
