@@ -32,6 +32,36 @@
 #   "Nord"            - Arctic, north-bluish color palette
 default = "Default"
 
+# Custom themes
+# =============
+# Define custom themes with [[theme.custom]]. Colors can be "#RRGGBB" hex
+# or named colors: black, red, green, yellow, blue, magenta, cyan, white,
+# gray, dark-gray, light-red, light-green, light-yellow, light-blue,
+# light-magenta, light-cyan.
+#
+# `inherits` copies another theme's palette before applying your overrides.
+# Without it, a custom theme sharing a built-in's name inherits that built-in;
+# a new name inherits Default.
+#
+# `foreground` and `background` are broad-brush aliases — specific fields
+# override them. Cursor, search, and row-highlight colors are excluded from
+# aliases so they keep contrast from the parent theme.
+#
+# [[theme.custom]]
+# name = "tokyonight"
+# inherits = "Dracula"
+# foreground = "#c0caf5"
+# background = "#1a1b26"
+# header_fg = "#7aa2f7"
+# border_fg = "#565f89"
+#
+# Per-field overrides (all optional):
+#   string_fg, number_fg, bool_fg, datetime_fg, error_fg, empty_fg,
+#   header_fg, header_bg, current_cell_fg, current_cell_bg,
+#   current_row_bg, current_col_fg, alternating_row_bg,
+#   search_match_fg, search_match_bg, current_search_fg, current_search_bg,
+#   border_fg, status_bar_fg, status_bar_bg
+
 # =============================================================================
 # UI SETTINGS
 # =============================================================================

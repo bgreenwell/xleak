@@ -4,8 +4,9 @@ use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
+use super::TuiOptions;
 use super::clipboard::{self, CopyOutcome};
-use super::theme::Theme;
+use super::theme::ThemeSet;
 
 /// Cached row data for lazy loading
 pub(crate) struct RowCache {
@@ -158,7 +159,7 @@ pub struct TuiState {
     // Clipboard state
     pub copy_feedback: Option<(String, Instant)>, // Message and timestamp for copy feedback
     // Theme state
-    pub current_theme: Theme, // Current color theme
+    pub themes: ThemeSet, // Available themes and the active one
     // Config state
     pub config: crate::config::Config, // User configuration
     // No-header mode
@@ -177,15 +178,24 @@ impl TuiState {
     pub const LAZY_LOADING_THRESHOLD: usize = 1000;
     pub const ROW_CACHE_SIZE: usize = 200;
 
+    /// `themes` is resolved by the caller rather than here, so that config
+    /// errors and warnings surface before the terminal enters the alternate
+    /// screen.
     pub fn new(
         mut workbook: Workbook,
         initial_sheet_name: &str,
         config: &crate::config::Config,
-        horizontal_scroll: bool,
-        no_header: bool,
-        no_column_id: bool,
-        no_row_id: bool,
+        themes: ThemeSet,
+        options: &TuiOptions,
     ) -> Result<Self> {
+        let &TuiOptions {
+            horizontal_scroll,
+            no_header,
+            no_column_id,
+            no_row_id,
+            ..
+        } = options;
+
         let sheet_names = workbook.sheet_names();
         let current_sheet_index = sheet_names
             .iter()
@@ -233,7 +243,7 @@ impl TuiState {
             jump_mode: false,
             jump_input: String::new(),
             copy_feedback: None,
-            current_theme: Self::parse_theme_name(&config.theme.default),
+            themes,
             config: config.clone(),
             no_header,
             no_column_id,
@@ -247,18 +257,6 @@ impl TuiState {
         }
 
         Ok(state)
-    }
-
-    /// Parse theme name from config string
-    pub fn parse_theme_name(name: &str) -> Theme {
-        match name.to_lowercase().as_str() {
-            "dracula" => Theme::Dracula,
-            "solarized dark" | "solarizeddark" => Theme::SolarizedDark,
-            "solarized light" | "solarizedlight" => Theme::SolarizedLight,
-            "github dark" | "githubdark" => Theme::GitHubDark,
-            "nord" => Theme::Nord,
-            _ => Theme::Default,
-        }
     }
 
     pub fn current_sheet_name(&self) -> &str {

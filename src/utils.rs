@@ -69,6 +69,14 @@ pub fn detect_file_type<P: AsRef<Path>>(path: P) -> io::Result<FileType> {
     Ok(FileType::Unknown)
 }
 
+/// Normalize a name for case- and separator-insensitive matching.
+///
+/// Used for both theme names and color names so that `"Solarized Dark"`,
+/// `"solarized-dark"`, and `"solarized_dark"` all resolve the same way.
+pub fn normalize_name(name: &str) -> String {
+    name.trim().to_lowercase().replace([' ', '_', '-'], "")
+}
+
 /// Strip control characters (Unicode `Cc`: C0, DEL, C1) except tab and
 /// newline, so untrusted spreadsheet content can't inject terminal escape
 /// sequences into non-interactive output (#59). Borrows when already clean.
@@ -97,6 +105,17 @@ pub fn column_index_to_letters(col: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_normalize_name() {
+        assert_eq!(normalize_name("Solarized Dark"), "solarizeddark");
+        assert_eq!(normalize_name("solarized-dark"), "solarizeddark");
+        assert_eq!(normalize_name("solarized_dark"), "solarizeddark");
+        assert_eq!(normalize_name("  Nord  "), "nord");
+        assert_eq!(normalize_name("GitHub Dark"), "githubdark");
+        assert_eq!(normalize_name("github_dark"), "githubdark");
+        assert_eq!(normalize_name("light-yellow"), "lightyellow");
+    }
 
     #[test]
     fn test_sanitize_terminal_text() {

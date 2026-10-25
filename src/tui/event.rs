@@ -9,7 +9,9 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::time::Duration;
 
+use super::TuiOptions;
 use super::state::TuiState;
+use super::theme::ThemeSet;
 
 impl TuiState {
     /// Check if a key press matches a configured action
@@ -149,7 +151,7 @@ impl TuiState {
                 self.show_help = true;
                 self.help_scroll = 0;
             } else if self.key_matches(code, modifiers, "theme_toggle") {
-                self.current_theme = self.current_theme.next();
+                self.themes.cycle();
             } else if self.key_matches(code, modifiers, "search") {
                 self.search_mode = true;
                 self.clear_search();
@@ -217,15 +219,16 @@ impl Drop for TerminalGuard {
     }
 }
 
-/// Run the TUI application
+/// Run the TUI application.
+///
+/// `themes` is resolved by the caller so that `--theme` errors and warnings
+/// surface before we enter raw mode (and identically in non-interactive mode).
 pub fn run_tui(
     workbook: Workbook,
     sheet_name: &str,
     config: &crate::config::Config,
-    horizontal_scroll: bool,
-    no_header: bool,
-    no_column_id: bool,
-    no_row_id: bool,
+    themes: ThemeSet,
+    options: &TuiOptions,
 ) -> Result<()> {
     use std::io::IsTerminal;
     if !io::stdout().is_terminal() {
@@ -254,15 +257,7 @@ pub fn run_tui(
     let mut terminal = Terminal::new(backend).context("Failed to initialize terminal backend")?;
 
     // Create app state
-    let mut app = TuiState::new(
-        workbook,
-        sheet_name,
-        config,
-        horizontal_scroll,
-        no_header,
-        no_column_id,
-        no_row_id,
-    )?;
+    let mut app = TuiState::new(workbook, sheet_name, config, themes, options)?;
 
     // Main event loop
     run_event_loop(&mut terminal, &mut app)

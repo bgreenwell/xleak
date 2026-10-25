@@ -5,6 +5,28 @@ mod state;
 mod theme;
 
 pub use event::run_tui;
+pub(crate) use theme::color_field_table;
+pub use theme::resolve_themes_from_config;
+pub use theme::truecolor_warning;
+
+/// Display options for a TUI session, all sourced from CLI flags.
+///
+/// These are passed as one value rather than a run of positional booleans,
+/// where `run_tui(wb, name, cfg, false, true, false, true)` says nothing about
+/// which flag is which.
+#[derive(Debug, Clone, Default)]
+pub struct TuiOptions {
+    /// Auto-size columns and allow horizontal scrolling.
+    pub horizontal_scroll: bool,
+    /// Treat the first row as data rather than headers.
+    pub no_header: bool,
+    /// Hide the column-letter row (A, B, C, ...).
+    pub no_column_id: bool,
+    /// Hide the row-number column.
+    pub no_row_id: bool,
+    /// Override the startup theme (`--theme`).
+    pub theme: Option<String>,
+}
 
 #[cfg(test)]
 mod tests {
