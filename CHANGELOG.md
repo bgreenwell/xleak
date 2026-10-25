@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom color themes via `[[theme.custom]]` in config.toml with `#RRGGBB` hex and named color support, `inherits` for theme inheritance, and `foreground`/`background` broad-brush aliases ([#42](https://github.com/bgreenwell/xleak/issues/42))
 - `--theme <NAME>` CLI flag to select a theme at launch, overriding the configured default
 - Truecolor warning on stderr when launching the interactive TUI with a custom theme that uses RGB colors and `COLORTERM` doesn't advertise truecolor support. Built-in themes are not checked; graceful fallback for all themes is tracked in [#48](https://github.com/bgreenwell/xleak/issues/48)
+- Vertical scrollbar for tables taller than the interactive viewport ([#38](https://github.com/bgreenwell/xleak/issues/38))
 - OSC 52 clipboard support: `c`/`C` now copy via OSC 52 (works over SSH) in addition to the system clipboard
 - CSV/TSV support: read and interactively view `.csv`/`.tsv` files as a single sheet (behind the default-on `csv` feature)
 - `--csv-delimiter` option to override the inferred CSV/TSV field delimiter
