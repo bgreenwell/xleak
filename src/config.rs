@@ -265,6 +265,7 @@ profile = "default"
 # copy_cell = "c"
 # copy_row = "C"
 # jump = "Ctrl+g"
+# sort = "s"
 # show_cell_detail = "Enter"
 
 # VIM-style navigation (when profile = "vim")
@@ -352,6 +353,7 @@ fn get_default_keybinding(action: &str) -> Option<(KeyCode, KeyModifiers)> {
         "copy_cell" => ("c", KeyModifiers::empty()),
         "copy_row" => ("C", KeyModifiers::SHIFT),
         "jump" => ("g", KeyModifiers::CONTROL),
+        "sort" => ("s", KeyModifiers::empty()),
         "show_cell_detail" => ("Enter", KeyModifiers::empty()),
         "next_sheet" => ("Tab", KeyModifiers::empty()),
         "prev_sheet" => ("Tab", KeyModifiers::SHIFT),

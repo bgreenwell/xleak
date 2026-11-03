@@ -268,6 +268,62 @@ impl LazySheetData {
         }
     }
 
+    /// Single zero-indexed data row (header excluded unless no_header), read by
+    /// direct cell access so it costs O(width) regardless of the row position.
+    pub fn get_row(&self, row: usize, no_header: bool) -> (Vec<CellValue>, Vec<Option<String>>) {
+        if row >= self.height {
+            return (Vec::new(), Vec::new());
+        }
+
+        match &self.source {
+            LazySource::Excel {
+                range,
+                formula_range,
+            } => {
+                let sheet_row = if no_header { row } else { row + 1 };
+                let cells = (0..self.width)
+                    .map(|col| {
+                        range
+                            .get((sheet_row, col))
+                            .map(SheetData::datatype_to_cellvalue)
+                            .unwrap_or(CellValue::Empty)
+                    })
+                    .collect();
+                let formulas = (0..self.width)
+                    .map(|col| {
+                        formula_range
+                            .as_ref()
+                            .and_then(|f| f.get_value((sheet_row as u32, col as u32)))
+                            .filter(|s| !s.is_empty())
+                            .cloned()
+                    })
+                    .collect();
+                (cells, formulas)
+            }
+            #[cfg(feature = "csv")]
+            LazySource::Csv { rows } => (rows[row].clone(), vec![None; self.width]),
+        }
+    }
+
+    /// Single cell by zero-indexed data row and column, by direct access.
+    pub fn cell_value(&self, row: usize, col: usize, no_header: bool) -> CellValue {
+        if row >= self.height || col >= self.width {
+            return CellValue::Empty;
+        }
+
+        match &self.source {
+            LazySource::Excel { range, .. } => {
+                let sheet_row = if no_header { row } else { row + 1 };
+                range
+                    .get((sheet_row, col))
+                    .map(SheetData::datatype_to_cellvalue)
+                    .unwrap_or(CellValue::Empty)
+            }
+            #[cfg(feature = "csv")]
+            LazySource::Csv { rows } => rows[row].get(col).cloned().unwrap_or(CellValue::Empty),
+        }
+    }
+
     fn get_formulas_for_range(
         &self,
         start: usize,
@@ -943,5 +999,25 @@ mod tests {
         assert_eq!(grid[0][0].as_deref(), Some("=ROW0"));
         assert_eq!(grid[1][0], None);
         assert_eq!(grid[2][0].as_deref(), Some("=ROW2"));
+    }
+
+    #[test]
+    fn test_lazy_get_row_matches_get_rows() {
+        for no_header in [false, true] {
+            let (range, formulas) = range_with_formulas();
+            let lazy = LazySheetData::from_range_with_formulas(range, Some(formulas), no_header);
+            let (rows, grid) = lazy.get_rows(0, lazy.height, no_header);
+            for i in 0..lazy.height {
+                let (row, formula_row) = lazy.get_row(i, no_header);
+                let raw = |r: &[CellValue]| r.iter().map(|c| c.to_raw_string()).collect::<Vec<_>>();
+                assert_eq!(raw(&row), raw(&rows[i]), "row {i}, no_header={no_header}");
+                assert_eq!(formula_row, grid[i], "row {i}, no_header={no_header}");
+                assert_eq!(
+                    lazy.cell_value(i, 0, no_header).to_raw_string(),
+                    rows[i][0].to_raw_string()
+                );
+            }
+            assert!(lazy.get_row(lazy.height, no_header).0.is_empty());
+        }
     }
 }
