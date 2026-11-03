@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use super::TuiOptions;
 use super::clipboard::{self, CopyOutcome};
+use super::sort::{self, SheetView, SortDirection};
 use super::theme::ThemeSet;
 
 /// Cached row data for lazy loading
@@ -105,6 +106,34 @@ impl SheetDataSource {
         }
     }
 
+    /// One row by direct access, bypassing the row cache.
+    pub fn get_row(&self, row: usize) -> (Vec<CellValue>, Vec<Option<String>>) {
+        match self {
+            SheetDataSource::Eager(data) => (
+                data.rows.get(row).cloned().unwrap_or_default(),
+                data.formulas.get(row).cloned().unwrap_or_default(),
+            ),
+            SheetDataSource::Lazy {
+                data, no_header, ..
+            } => data.get_row(row, *no_header),
+        }
+    }
+
+    /// One cell value by direct access, bypassing the row cache.
+    pub fn cell_value(&self, row: usize, col: usize) -> CellValue {
+        match self {
+            SheetDataSource::Eager(data) => data
+                .rows
+                .get(row)
+                .and_then(|r| r.get(col))
+                .cloned()
+                .unwrap_or(CellValue::Empty),
+            SheetDataSource::Lazy {
+                data, no_header, ..
+            } => data.cell_value(row, col, *no_header),
+        }
+    }
+
     pub fn get_cell(&mut self, row: usize, col: usize) -> (Option<CellValue>, Option<String>) {
         match self {
             SheetDataSource::Eager(data) => {
@@ -135,7 +164,7 @@ pub struct TuiState {
     pub workbook: Workbook,
     pub sheet_names: Vec<String>,
     pub current_sheet_index: usize,
-    pub sheet_data: SheetDataSource,
+    pub sheet_data: SheetView,
     pub should_quit: bool,
     pub cursor_row: usize,               // Current row (0-indexed in data)
     pub cursor_col: usize,               // Current column (0-indexed)
@@ -168,10 +197,18 @@ pub struct TuiState {
     pub no_column_id: bool,
     // Hide the row-number column
     pub no_row_id: bool,
-    // Remembered cursor/scroll position per sheet index, so switching back to a
-    // previously-viewed sheet restores where the user left off.
-    // Value: (cursor_row, cursor_col, scroll_offset, horizontal_scroll_offset).
-    sheet_positions: HashMap<usize, (usize, usize, usize, usize)>,
+    // Remembered cursor/scroll position and sort per sheet index, so switching
+    // back to a previously-viewed sheet restores where the user left off.
+    sheet_positions: HashMap<usize, SheetPosition>,
+}
+
+#[derive(Clone, Copy)]
+struct SheetPosition {
+    cursor_row: usize,
+    cursor_col: usize,
+    scroll_offset: usize,
+    horizontal_scroll_offset: usize,
+    sort: Option<(usize, SortDirection)>,
 }
 
 impl TuiState {
@@ -207,7 +244,7 @@ impl TuiState {
         let sheet_height = lazy_data.height;
 
         // Choose loading strategy based on size
-        let sheet_data = if sheet_height > Self::LAZY_LOADING_THRESHOLD {
+        let sheet_data = SheetView::new(if sheet_height > Self::LAZY_LOADING_THRESHOLD {
             SheetDataSource::Lazy {
                 data: lazy_data,
                 cache: None,
@@ -217,7 +254,7 @@ impl TuiState {
         } else {
             // Convert to eager loading for small files
             SheetDataSource::Eager(lazy_data.to_sheet_data(no_header))
-        };
+        });
 
         let mut state = Self {
             workbook,
@@ -297,21 +334,28 @@ impl TuiState {
     fn save_current_position(&mut self) {
         self.sheet_positions.insert(
             self.current_sheet_index,
-            (
-                self.cursor_row,
-                self.cursor_col,
-                self.scroll_offset,
-                self.horizontal_scroll_offset,
-            ),
+            SheetPosition {
+                cursor_row: self.cursor_row,
+                cursor_col: self.cursor_col,
+                scroll_offset: self.scroll_offset,
+                horizontal_scroll_offset: self.horizontal_scroll_offset,
+                sort: self.sheet_data.sort(),
+            },
         );
     }
 
     /// Restore the remembered position for the active sheet, clamping to the new
     /// sheet's bounds. Falls back to the top-left when no position is stored.
     fn restore_position(&mut self) {
-        if let Some(&(row, col, scroll, hscroll)) =
-            self.sheet_positions.get(&self.current_sheet_index)
+        if let Some(&SheetPosition {
+            cursor_row: row,
+            cursor_col: col,
+            scroll_offset: scroll,
+            horizontal_scroll_offset: hscroll,
+            sort,
+        }) = self.sheet_positions.get(&self.current_sheet_index)
         {
+            self.sheet_data.set_sort(sort);
             let max_row = self.sheet_data.height().saturating_sub(1);
             let max_col = self.sheet_data.width().saturating_sub(1);
             self.cursor_row = row.min(max_row);
@@ -331,7 +375,7 @@ impl TuiState {
         let lazy_data = self.workbook.load_sheet_lazy(&sheet_name, self.no_header)?;
         let sheet_height = lazy_data.height;
 
-        self.sheet_data = if sheet_height > Self::LAZY_LOADING_THRESHOLD {
+        self.sheet_data = SheetView::new(if sheet_height > Self::LAZY_LOADING_THRESHOLD {
             SheetDataSource::Lazy {
                 data: lazy_data,
                 cache: None,
@@ -340,7 +384,7 @@ impl TuiState {
             }
         } else {
             SheetDataSource::Eager(lazy_data.to_sheet_data(self.no_header))
-        };
+        });
 
         if self.horizontal_scroll_enabled {
             self.column_widths = self.calculate_column_widths();
@@ -440,6 +484,55 @@ impl TuiState {
         self.current_match_index = None;
     }
 
+    /// Cycle the sort on the cursor column: file order -> ascending ->
+    /// descending -> file order. The cursor stays on the same record.
+    pub fn cycle_sort(&mut self) {
+        if self.sheet_data.width() == 0 {
+            return;
+        }
+        let col = self.cursor_col;
+        let next = sort::next_sort(self.sheet_data.sort(), col);
+
+        let cursor_data_row = self.sheet_data.data_row(self.cursor_row);
+        let match_data_cells: Vec<(usize, usize)> = self
+            .search_matches
+            .iter()
+            .map(|&(row, c)| (self.sheet_data.data_row(row), c))
+            .collect();
+        let current_match = self
+            .current_match_index
+            .and_then(|i| match_data_cells.get(i).copied());
+
+        self.sheet_data.set_sort(next);
+
+        self.cursor_row = self.sheet_data.display_row(cursor_data_row);
+        if !match_data_cells.is_empty() {
+            let mut matches: Vec<(usize, usize)> = match_data_cells
+                .into_iter()
+                .map(|(row, c)| (self.sheet_data.display_row(row), c))
+                .collect();
+            matches.sort_unstable();
+            self.current_match_index = current_match
+                .map(|(row, c)| (self.sheet_data.display_row(row), c))
+                .and_then(|cell| matches.binary_search(&cell).ok());
+            self.search_match_set = matches.iter().copied().collect();
+            self.search_matches = matches;
+        }
+
+        let header = self
+            .sheet_data
+            .headers()
+            .get(col)
+            .cloned()
+            .unwrap_or_default();
+        let message = match next {
+            Some((_, SortDirection::Ascending)) => format!("Sorted by {header} ascending"),
+            Some((_, SortDirection::Descending)) => format!("Sorted by {header} descending"),
+            None => "File order restored".to_string(),
+        };
+        self.copy_feedback = Some((message, Instant::now()));
+    }
+
     pub fn enter_jump_mode(&mut self) {
         self.jump_mode = true;
         self.jump_input.clear();
@@ -458,7 +551,7 @@ impl TuiState {
         // they match the row numbers shown in the gutter. Sheet row 1 is the
         // header (when present); jumping there lands on the first data row.
         let first_row = self.first_data_sheet_row();
-        let last_row = self.data_row_to_sheet_row(self.sheet_data.height().saturating_sub(1));
+        let last_row = self.sheet_data.height().saturating_sub(1) + first_row;
 
         if let Ok(row_num) = input.parse::<usize>() {
             if self.sheet_data.height() > 0 && row_num >= first_row && row_num <= last_row {
@@ -759,16 +852,18 @@ impl TuiState {
         if no_header { 1 } else { 2 }
     }
 
-    /// Convert a 0-based data-row index into its real 1-based sheet row number.
-    pub fn data_row_to_sheet_row(&self, data_row: usize) -> usize {
-        data_row + self.first_data_sheet_row()
+    /// Convert a 0-based display-row index into its real 1-based sheet row
+    /// number, accounting for any active sort.
+    pub fn data_row_to_sheet_row(&self, display_row: usize) -> usize {
+        self.sheet_data.data_row(display_row) + self.first_data_sheet_row()
     }
 
-    /// Convert a real 1-based sheet row number into a 0-based data-row index,
-    /// clamping the header row (and anything above the first data row) to the
-    /// first selectable data row.
+    /// Convert a real 1-based sheet row number into a 0-based display-row
+    /// index, clamping the header row (and anything above the first data row)
+    /// to the first data row.
     pub fn sheet_row_to_data_row(&self, sheet_row: usize) -> usize {
-        sheet_row.saturating_sub(self.first_data_sheet_row())
+        self.sheet_data
+            .display_row(sheet_row.saturating_sub(self.first_data_sheet_row()))
     }
 
     pub fn current_cell_address(&self) -> String {
