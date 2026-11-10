@@ -412,10 +412,12 @@ impl CellValue {
         let hours = total_seconds / 3600;
         let minutes = (total_seconds % 3600) / 60;
         let seconds = total_seconds % 60;
-        (
-            date.format("%Y-%m-%d").to_string(),
-            Some(format!("{:02}:{:02}:{:02}", hours, minutes, seconds)),
-        )
+        let time = format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+        // A serial below 1 is a time of day with no date.
+        if days == 0 {
+            return (time, None);
+        }
+        (date.format("%Y-%m-%d").to_string(), Some(time))
     }
 
     /// Returns unformatted value (for export/clipboard)
@@ -816,6 +818,12 @@ mod tests {
         let display = val.to_string();
         // Should contain a date in YYYY-MM-DD format
         assert!(display.contains("1900") || display.contains("1899"));
+    }
+
+    #[test]
+    fn test_time_only_has_no_date() {
+        let val = CellValue::DateTime(0.5);
+        assert_eq!(val.to_string(), "12:00:00");
     }
 
     #[test]
