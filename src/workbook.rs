@@ -708,6 +708,18 @@ impl SheetData {
             Data::Float(f) => CellValue::Float(*f),
             Data::Bool(b) => CellValue::Bool(*b),
             Data::Error(e) => CellValue::Error(format!("{e:?}")),
+            // [h]:mm cells are elapsed time, not a date: 1.5 is 36:00:00, not 1900-01-01 12:00
+            Data::DateTime(d) if d.is_duration() => {
+                let secs = (d.as_f64() * 86400.0).round() as i64;
+                let sign = if secs < 0 { "-" } else { "" };
+                let secs = secs.abs();
+                CellValue::String(format!(
+                    "{sign}{}:{:02}:{:02}",
+                    secs / 3600,
+                    secs % 3600 / 60,
+                    secs % 60
+                ))
+            }
             Data::DateTime(d) => CellValue::DateTime(d.as_f64()),
             Data::DateTimeIso(s) => CellValue::String(s.clone()),
             Data::DurationIso(s) => CellValue::String(s.clone()),
@@ -718,6 +730,16 @@ impl SheetData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_duration_cell_shows_elapsed_time() {
+        use calamine::{ExcelDateTime, ExcelDateTimeType};
+        let cell = Data::DateTime(ExcelDateTime::new(1.5, ExcelDateTimeType::TimeDelta, false));
+        assert_eq!(
+            SheetData::datatype_to_cellvalue(&cell).to_string(),
+            "36:00:00"
+        );
+    }
 
     #[test]
     fn test_cellvalue_display_integer() {
