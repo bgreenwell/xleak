@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Column sorting in the interactive TUI: `s` cycles the current column through ascending, descending, and file order using Excel's sort order (numbers, text, booleans, errors; blanks last). Row numbers, cell addresses, and `Ctrl+G` keep referring to real sheet rows, and each sheet remembers its own sort
 - Custom color themes via `[[theme.custom]]` in config.toml with `#RRGGBB` hex and named color support, `inherits` for theme inheritance, and `foreground`/`background` broad-brush aliases ([#42](https://github.com/bgreenwell/xleak/issues/42))
 - `--theme <NAME>` CLI flag to select a theme at launch, overriding the configured default
 - Truecolor warning on stderr when launching the interactive TUI with a custom theme that uses RGB colors and `COLORTERM` doesn't advertise truecolor support. Built-in themes are not checked; graceful fallback for all themes is tracked in [#48](https://github.com/bgreenwell/xleak/issues/48)

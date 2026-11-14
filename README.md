@@ -37,6 +37,7 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 - **Clipboard support** - copy cells (`c`) or entire rows (`C`) to clipboard (OSC 52 + system clipboard, works over SSH)
 - **Formula display** - view Excel formulas in cell detail view (Enter key)
 - **Jump to row/column** - press `Ctrl+G` to jump to any cell (e.g., `A100`, `500`, `10,5`)
+- **Column sorting** - press `s` on a column to cycle ascending → descending → file order, using Excel's sort order
 - **Large file optimization** - lazy loading for files with 1000+ rows
 - **Vertical scrollbar** - shows the current position when table rows exceed the viewport
 - **Progress indicators** - real-time feedback for long operations
@@ -153,6 +154,7 @@ xleak wide-data.xlsx -i -H
 - `/` - Search across all cells
 - `n` / `N` - Jump to next/previous search result
 - `Ctrl+G` - Jump to specific row/cell (e.g., `100`, `A50`, `10,5`)
+- `s` - Sort by current column (ascending → descending → file order)
 - `c` - Copy current cell to clipboard (OSC 52 + system clipboard, works over SSH)
 - `C` - Copy entire row to clipboard (tab-separated)
 - `Tab` / `Shift+Tab` - Switch between sheets
@@ -408,6 +410,7 @@ Standard keybindings for terminal applications:
 | Jump to cell | `Ctrl+G` | Jump to specific row/cell |
 | Search | `/` | Full-text search |
 | Next/prev match | `n` `N` | Navigate search results |
+| Sort column | `s` | Cycle ascending → descending → file order |
 | Copy cell | `c` | Copy cell to clipboard |
 | Copy row | `C` (Shift+c) | Copy entire row |
 | **Sheets** | | |
@@ -479,6 +482,7 @@ jump = "Ctrl+j"
 | `copy_cell` | `c` | `y` | Copy cell |
 | `copy_row` | `C` | `Y` | Copy row |
 | `jump` | `Ctrl+g` | `Ctrl+g` | Jump to cell |
+| `sort` | `s` | `s` | Sort by current column |
 | `show_cell_detail` | `Enter` | `Enter` | Show details |
 | `next_sheet` | `Tab` | `Tab` | Next sheet |
 | `prev_sheet` | `Shift+Tab` | `Shift+Tab` | Previous sheet |
@@ -544,6 +548,7 @@ profile = "default"
 [keybindings.custom]
 quit = "x"
 search = "s"
+sort = "o"
 copy_cell = "Ctrl+c"
 copy_row = "Ctrl+Shift+c"
 ```

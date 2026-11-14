@@ -11,6 +11,7 @@ use ratatui::{
 };
 use std::time::Duration;
 
+use super::sort::SortDirection;
 use super::state::TuiState;
 
 fn table_scrollbar_state(
@@ -113,6 +114,14 @@ impl TuiState {
         let headers = self.sheet_data.headers().to_vec();
         let colors = self.themes.current().clone();
 
+        let sort_marker = self.sheet_data.sort().map(|(col, direction)| {
+            let arrow = match direction {
+                SortDirection::Ascending => "▲",
+                SortDirection::Descending => "▼",
+            };
+            (col, arrow)
+        });
+
         let mut header_cells: Vec<Cell> = Vec::new();
 
         // Row-number gutter for the sticky header. The column-letter line (if any)
@@ -159,19 +168,34 @@ impl TuiState {
                         base_style
                     };
 
+                    let arrow = sort_marker
+                        .filter(|&(sorted_col, _)| sorted_col == col_idx)
+                        .map(|(_, arrow)| arrow);
+                    let with_arrow = |text: String| match arrow {
+                        Some(arrow) => format!("{arrow} {text}"),
+                        None => text,
+                    };
+
                     let mut lines = Vec::with_capacity(header_row_count as usize);
 
-                    // Column-letter line.
+                    // Column-letter line; carries the sort arrow when there is
+                    // no title line.
                     if show_column_id {
-                        lines.push(Line::from(Span::styled(
-                            utils::column_index_to_letters(col_idx),
-                            highlight_style,
-                        )));
+                        let letters = utils::column_index_to_letters(col_idx);
+                        let text = if show_title_row {
+                            letters
+                        } else {
+                            with_arrow(letters)
+                        };
+                        lines.push(Line::from(Span::styled(text, highlight_style)));
                     }
 
                     // Title line.
                     if show_title_row {
-                        lines.push(Line::from(Span::styled(h.as_str(), highlight_style)));
+                        lines.push(Line::from(Span::styled(
+                            with_arrow(h.clone()),
+                            highlight_style,
+                        )));
                     }
 
                     Cell::from(lines).style(base_style)
@@ -180,7 +204,9 @@ impl TuiState {
 
         let header = Row::new(header_cells).height(header_row_count.max(1));
 
-        let row_number_offset = self.first_data_sheet_row();
+        let sheet_row_numbers: Vec<usize> = (visible_start..visible_start + table_height)
+            .map(|row| self.data_row_to_sheet_row(row))
+            .collect();
 
         let (visible_rows, _visible_formulas) =
             self.sheet_data.get_rows(visible_start, table_height);
@@ -190,7 +216,7 @@ impl TuiState {
             .enumerate()
             .map(|(visible_idx, row)| {
                 let row_idx = visible_start + visible_idx;
-                let display_row_num = row_idx + row_number_offset;
+                let display_row_num = sheet_row_numbers[visible_idx];
 
                 let mut cells: Vec<Cell> = Vec::new();
 
@@ -581,6 +607,24 @@ impl TuiState {
             Line::from(vec![
                 Span::styled("  Ctrl+G           ", Style::default().fg(Color::Green)),
                 Span::raw("Jump to row/cell (e.g., 100, A5, or 10,3)"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled(
+                "SORTING",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(vec![
+                Span::styled("  s                ", Style::default().fg(Color::Green)),
+                Span::raw("Sort by current column: ascending → descending → file order"),
+            ]),
+            Line::from(vec![
+                Span::styled("                   ", Style::default().fg(Color::Green)),
+                Span::styled(
+                    "(Excel order: numbers, text, FALSE/TRUE, errors; blanks last)",
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Line::from(""),
             Line::from(Span::styled(

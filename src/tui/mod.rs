@@ -1,6 +1,7 @@
 mod clipboard;
 mod event;
 mod rendering;
+mod sort;
 mod state;
 mod theme;
 

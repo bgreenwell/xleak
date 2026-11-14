@@ -23,7 +23,7 @@ cargo install --path .                                      # install globally
 - `main.rs` — CLI parsing, orchestration
 - `workbook.rs` — Excel/CSV I/O, data extraction; `Workbook` wraps a `Backend` enum (calamine `Sheets` or in-memory CSV)
 - `csv.rs` — CSV/TSV parsing into a single-sheet `SheetData`/`LazySheetData` (behind `csv` feature)
-- `tui/` — Interactive TUI: `theme.rs` (themes/colors), `state.rs` (app state), `rendering.rs` (draw), `event.rs` (event loop), `clipboard.rs` (OSC 52 + system clipboard)
+- `tui/` — Interactive TUI: `theme.rs` (themes/colors), `state.rs` (app state), `sort.rs` (`SheetView`: column sort over the data source, display row ↔ data row mapping), `rendering.rs` (draw), `event.rs` (event loop), `clipboard.rs` (OSC 52 + system clipboard)
 - `display/` — Non-interactive output: `sheet.rs` (SheetData table), `table.rs` (TableData table), `export.rs` (CSV/JSON/text) via comfy-table
 - `cli.rs` — CLI argument definitions (clap)
 - `config.rs` — Configuration file loading (TOML)

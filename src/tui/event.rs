@@ -165,6 +165,8 @@ impl TuiState {
                 self.copy_current_row();
             } else if self.key_matches(code, modifiers, "jump") {
                 self.enter_jump_mode();
+            } else if self.key_matches(code, modifiers, "sort") {
+                self.cycle_sort();
             } else if self.key_matches(code, modifiers, "show_cell_detail") {
                 self.show_cell_detail = true;
                 self.cell_detail_scroll = 0;

@@ -133,6 +133,7 @@ profile = "default"
 # -----------------------------------------------------------------------------
 # show_cell_detail = "Enter"  # Show cell detail popup (formula, full value)
 # jump = "Ctrl+g"             # Jump to specific cell (e.g., A100, 10,5)
+# sort = "s"                  # Sort by current column: asc -> desc -> file order
 
 # -----------------------------------------------------------------------------
 # Sheet Navigation
