@@ -97,8 +97,13 @@ impl TuiState {
             let mut total_width = 0;
             let mut end = self.horizontal_scroll_offset;
 
-            for i in self.horizontal_scroll_offset..self.column_widths.len() {
-                total_width += self.column_widths[i] + 1;
+            for (i, width) in self
+                .column_widths
+                .iter()
+                .enumerate()
+                .skip(self.horizontal_scroll_offset)
+            {
+                total_width += width + 1;
                 end = i + 1;
                 if total_width > viewport_width {
                     break;
